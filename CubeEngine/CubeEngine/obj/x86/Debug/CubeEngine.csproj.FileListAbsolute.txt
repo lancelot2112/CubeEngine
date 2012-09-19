@@ -1,0 +1,9 @@
+c:\users\lancer\documents\visual studio 2010\Projects\CubeEngine\CubeEngine\CubeEngine\obj\x86\Debug\ResolveAssemblyReference.cache
+c:\users\lancer\documents\visual studio 2010\Projects\CubeEngine\CubeEngine\CubeEngine\obj\x86\Debug\Microsoft.Xna.Framework.RuntimeProfile.txt
+c:\users\lancer\documents\visual studio 2010\Projects\CubeEngine\CubeEngine\CubeEngine\bin\x86\Debug\Content\Font\Arial.xnb
+c:\users\lancer\documents\visual studio 2010\Projects\CubeEngine\CubeEngine\CubeEngine\bin\x86\Debug\CubeEngine.exe
+c:\users\lancer\documents\visual studio 2010\Projects\CubeEngine\CubeEngine\CubeEngine\bin\x86\Debug\CubeEngine.pdb
+c:\users\lancer\documents\visual studio 2010\Projects\CubeEngine\CubeEngine\CubeEngine\bin\x86\Debug\XerUtilities.dll
+c:\users\lancer\documents\visual studio 2010\Projects\CubeEngine\CubeEngine\CubeEngine\bin\x86\Debug\XerUtilities.pdb
+c:\users\lancer\documents\visual studio 2010\Projects\CubeEngine\CubeEngine\CubeEngine\obj\x86\Debug\CubeEngine.exe
+c:\users\lancer\documents\visual studio 2010\Projects\CubeEngine\CubeEngine\CubeEngine\obj\x86\Debug\CubeEngine.pdb

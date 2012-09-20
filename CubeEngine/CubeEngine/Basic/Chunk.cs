@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 
 namespace CubeEngine.Basic
 {
@@ -12,17 +13,38 @@ namespace CubeEngine.Basic
     /// </summary>
     public class Chunk
     {
-        public const byte CHUNK_SIZE = 16;
+        public const byte SIZE_X = 4;
+        public const byte SIZE_Y = 4;
+        public const byte SIZE_Z = 50;
  
         private Cube[,,] m_Cubes;
         public SuperGroupCoords Coords;
         public ChunkHash Hash;
         public Matrix WorldMatrix;
-        public bool Render;
+
+        //Render Members
+        public bool AllowRender;
+        private List<VertexPositionColor> solidVertexList;
+        private List<VertexPositionColor> transparentVertexList;
+        public VertexBuffer SolidVertexBuffer;
+        public VertexBuffer TransparentVertexBuffer;
+
 
         public Chunk()
         {
-            m_Cubes = new Cube[CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE];
+            m_Cubes = new Cube[SIZE_X, SIZE_Y, SIZE_Z];
+
+            for (byte x = 0; x < SIZE_X; x++)
+                for (byte y = 0; y < SIZE_Y; y++)
+                    for (byte z = 0; z < SIZE_Z; z++)
+                    {
+                        m_Cubes[x, y, z].Type = CubeType.Dirt;
+                    }
+
+            solidVertexList = new List<VertexPositionColor>();
+            transparentVertexList = new List<VertexPositionColor>();
+
+            WorldMatrix = Matrix.Identity;
         }
 
         public void SetCube(byte x, byte y, byte z, ref Cube cube)
@@ -44,18 +66,188 @@ namespace CubeEngine.Basic
             }
         }
 
+        public Cube GetCube(byte x, byte y, byte z)
+        {
+            if (InChunk(x, y, z)) return m_Cubes[x, y, z];
+            else return Cube.NULL;
+        }
+
         public bool InChunk(byte x, byte y, byte z)
         {
 
-            if (x < 0 || x >= CHUNK_SIZE)
+            if (x < 0 || x >= SIZE_X)
                 return false;
-            if (y < 0 || y >= CHUNK_SIZE)
+            if (y < 0 || y >= SIZE_Y)
                 return false;
-            if (z < 0 || z >= CHUNK_SIZE)
+            if (z < 0 || z >= SIZE_Z)
                 return false;
 
             return true;
         }
+
+        public void BuildVertices(GraphicsDevice graphics, Chunk posX = null, Chunk negX = null, Chunk posY = null, Chunk negY = null, Chunk posZ = null, Chunk negZ = null)
+        {
+            Cube neighbor;
+            Vector3 offset;
+            for(byte x = 0; x < SIZE_X; x++)
+                for(byte y = 0; y < SIZE_Y; y++)
+                    for (byte z = 0; z < SIZE_Z; z++)
+                    {
+                        offset.X = x;
+                        offset.Y = y;
+                        offset.Z = z;
+
+                        //-x
+                        if (x == 0) neighbor = (negX != null) ? negX.GetCube(SIZE_X - 1, y, z) : Cube.NULL;
+                        else neighbor = m_Cubes[x - 1, y, z];
+
+                        if (neighbor.IsTransparent())
+                        {
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_NPN + offset, Color.Green));
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_NPP + offset, Color.Green));
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_NNN + offset, Color.Green));
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_NNN + offset, Color.Green));
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_NPP + offset, Color.Green));
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_NNP + offset, Color.Green));
+                        }
+
+                        //+x
+                        if (x == SIZE_X - 1) neighbor = (posX != null) ? posX.GetCube(0, y, z) : Cube.NULL;
+                        else neighbor = m_Cubes[x + 1, y, z];
+
+                        if (neighbor.IsTransparent())
+                        {
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_PPP + offset, Color.Blue));
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_PPN + offset, Color.Blue));
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_PNP + offset, Color.Blue));
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_PNP + offset, Color.Blue));
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_PPN + offset, Color.Blue));
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_PNN + offset, Color.Blue));
+                        }
+
+                        //-y
+                        if (y == 0) neighbor = (negY != null) ? negY.GetCube(x, SIZE_Y - 1, z) : Cube.NULL;
+                        else neighbor = m_Cubes[x, y - 1, z];
+
+                        if (neighbor.IsTransparent())
+                        {
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_NNP + offset, Color.Orange));
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_PNP + offset, Color.Orange));
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_NNN + offset, Color.Orange));
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_NNN + offset, Color.Orange));
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_PNP + offset, Color.Orange));
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_PNN + offset, Color.Orange));
+                        }
+
+                        //+y
+                        if (y == SIZE_Y - 1) neighbor = (posY != null) ? posY.GetCube(x, 0, z) : Cube.NULL;
+                        else neighbor = m_Cubes[x, y + 1, z];
+
+                        if (neighbor.IsTransparent())
+                        {
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_NPN + offset, Color.Yellow));
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_PPN + offset, Color.Yellow));
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_NPP + offset, Color.Yellow));
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_NPP + offset, Color.Yellow));
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_PPN + offset, Color.Yellow));
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_PPP + offset, Color.Yellow));
+                        }
+
+                        //-z
+                        if (z == 0) neighbor = (negZ != null) ? negZ.GetCube(x, y, SIZE_Z - 1) : Cube.NULL;
+                        else neighbor = m_Cubes[x, y, z - 1];
+
+                        if (neighbor.IsTransparent())
+                        {
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_PPN + offset, Color.Violet));
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_NPN + offset, Color.Violet));
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_PNN + offset, Color.Violet));
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_PNN + offset, Color.Violet));
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_NPN + offset, Color.Violet));
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_NNN + offset, Color.Violet));
+                        }
+
+                        //+z
+                        if (z == SIZE_Z - 1) neighbor = (posZ != null) ? posZ.GetCube(x, y, 0) : Cube.NULL;
+                        else neighbor = m_Cubes[x, y, z + 1];
+
+                        if (neighbor.IsTransparent())
+                        {
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_NPP + offset, Color.Red));
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_PPP + offset, Color.Red));
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_NNP + offset, Color.Red));
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_NNP + offset, Color.Red));
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_PPP + offset, Color.Red));
+                            solidVertexList.Add(new VertexPositionColor(Cube.CORNER_PNP + offset, Color.Red));
+                        }
+                    }
+
+            SolidVertexBuffer = new VertexBuffer(graphics, typeof(VertexPositionColor), solidVertexList.Count, BufferUsage.None);
+            SolidVertexBuffer.SetData<VertexPositionColor>(solidVertexList.ToArray());
+        }
+
+    //    private void BuildFaces(Cube cubeToBuild, CubeFace facesToBuild, Vector3 offset, List<VertexPositionColor> vertexList)
+    //    {
+    //        if ((facesToBuild & CubeFace.PosX) == CubeFace.PosX)
+    //        {
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_PPP + offset, Color.Blue));
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_PPN + offset, Color.Blue));
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_PNP + offset, Color.Blue));
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_PNP + offset, Color.Blue));
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_PPN + offset, Color.Blue));
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_PNN + offset, Color.Blue));
+    //        }
+
+    //        if ((facesToBuild & CubeFace.NegX) == CubeFace.NegX)
+    //        {
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_NPN + offset, Color.Green));
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_NPP + offset, Color.Green));
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_NNN + offset, Color.Green));
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_NNN + offset, Color.Green));
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_NPP + offset, Color.Green));
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_NNP + offset, Color.Green));
+    //        }
+
+    //        if ((facesToBuild & CubeFace.PosY) == CubeFace.PosY)
+    //        {
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_NPN + offset, Color.Yellow));
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_PPN + offset, Color.Yellow));
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_NPP + offset, Color.Yellow));
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_NPP + offset, Color.Yellow));
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_PPN + offset, Color.Yellow));
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_PPP + offset, Color.Yellow));
+    //        }
+
+    //        if ((facesToBuild & CubeFace.NegY) == CubeFace.NegY)
+    //        {
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_NNP + offset, Color.Orange));
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_PNP + offset, Color.Orange));
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_NNN + offset, Color.Orange));
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_NNN + offset, Color.Orange));
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_PNP + offset, Color.Orange));
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_PNN + offset, Color.Orange));
+    //        }
+
+    //        if ((facesToBuild & CubeFace.PosZ) == CubeFace.PosZ)
+    //        {
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_NPP + offset, Color.Red));
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_PPP + offset, Color.Red));
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_NNP + offset, Color.Red));
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_NNP + offset, Color.Red));
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_PPP + offset, Color.Red));
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_PNP + offset, Color.Red));
+    //        }
+
+    //        if ((facesToBuild & CubeFace.NegZ) == CubeFace.NegZ)
+    //        {
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_PPN + offset, Color.Violet));
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_NPN + offset, Color.Violet));
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_PNN + offset, Color.Violet));
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_PNN + offset, Color.Violet));
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_NPN + offset, Color.Violet));
+    //            vertexList.Add(new VertexPositionColor(Cube.CORNER_NNN + offset, Color.Violet));
+    //        }
+    //    }
     }
 
     /// <summary>
@@ -109,6 +301,46 @@ namespace CubeEngine.Basic
             return x + (y << 8) + (z << 16);
         }
 
+        public int Add(byte x, byte y, byte z)
+        {
+            return Hash + x + (y << 8) + (z << 16);
+        }
+
+        public int Sub(byte x, byte y, byte z)
+        {
+            return Hash - x - (y << 8) - (z << 16);
+        }
+
+        public int AddX(byte x)
+        {
+            return Hash + x;
+        }
+
+        public int SubX(byte x)
+        {
+            return Hash - x;
+        }
+
+        public int AddY(byte y)
+        {
+            return Hash + (y << 8);
+        }
+
+        public int SubY(byte y)
+        {
+            return Hash - (y << 8);
+        }
+
+        public int AddZ(byte z)
+        {
+            return Hash + (z << 16);
+        }
+
+        public int SubZ(byte z)
+        {
+            return Hash - (z << 16);
+        }
+
         public static ChunkHash GetCoords(int hash)
         {
             byte x = (byte)hash;
@@ -116,5 +348,7 @@ namespace CubeEngine.Basic
             byte z = (byte)(hash>>16);
             return new ChunkHash(x, y, z);
         }
+
+
     }
 }

@@ -12,6 +12,8 @@ using Microsoft.Xna.Framework.Media;
 using CubeEngine.Basic;
 
 using XerUtilities.Debugging;
+using XerUtilities.Input;
+using XerUtilities.Rendering;
 
 namespace CubeEngine
 {
@@ -22,6 +24,11 @@ namespace CubeEngine
     {
         GraphicsDeviceManager graphics;
         DebugManager debug;
+        Chunk chunk;
+        XerInput input;
+        DeltaFreeCamera camera;
+        BasicEffect effect;
+        RasterizerState currentRaster;
 
         public CubeEngineGame()
         {
@@ -38,7 +45,9 @@ namespace CubeEngine
         /// </summary>
         protected override void Initialize()
         {
-            // TODO: Add your initialization logic here
+            input = new XerInput(this);
+            chunk = new Chunk();
+            camera = new DeltaFreeCamera(input, GraphicsDevice);
 
             base.Initialize();
         }
@@ -49,6 +58,12 @@ namespace CubeEngine
         /// </summary>
         protected override void LoadContent()
         {
+            chunk.BuildVertices(graphics.GraphicsDevice);
+
+            effect = new BasicEffect(GraphicsDevice);
+            effect.VertexColorEnabled = true;
+
+            currentRaster = RasterizerState.CullCounterClockwise;
 
             // TODO: use this.Content to load your game content here
         }
@@ -59,6 +74,7 @@ namespace CubeEngine
         /// </summary>
         protected override void UnloadContent()
         {
+            chunk.SolidVertexBuffer.Dispose();
             // TODO: Unload any non ContentManager content here
         }
 
@@ -69,10 +85,15 @@ namespace CubeEngine
         /// <param name="gameTime">Provides a snapshot of timing values.</param>
         protected override void Update(GameTime gameTime)
         {
-            // Allows the game to exit
-            if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed)
-                this.Exit();
+            float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
+            camera.Update(dt);
 
+            if(input.Keyboard.F2JustPressed) 
+            {
+                currentRaster = new RasterizerState();
+                currentRaster.CullMode = GraphicsDevice.RasterizerState.FillMode == FillMode.Solid ? CullMode.None : CullMode.CullCounterClockwiseFace;
+                currentRaster.FillMode = GraphicsDevice.RasterizerState.FillMode == FillMode.Solid ? FillMode.WireFrame : FillMode.Solid;                
+            }
             // TODO: Add your update logic here
 
             base.Update(gameTime);
@@ -84,8 +105,21 @@ namespace CubeEngine
         /// <param name="gameTime">Provides a snapshot of timing values.</param>
         protected override void Draw(GameTime gameTime)
         {
+            GraphicsDevice.RasterizerState = currentRaster;
+
             GraphicsDevice.Clear(Color.CornflowerBlue);
 
+            effect.Projection = camera.Projection;
+            effect.View = camera.View;
+
+            chunk.WorldMatrix = chunk.WorldMatrix * camera.InverseTranslation;
+            effect.World = chunk.WorldMatrix;
+            
+
+            GraphicsDevice.SetVertexBuffer(chunk.SolidVertexBuffer);
+
+            effect.CurrentTechnique.Passes[0].Apply();
+            GraphicsDevice.DrawPrimitives(PrimitiveType.TriangleList, 0, chunk.SolidVertexBuffer.VertexCount / 3);
             // TODO: Add your drawing code here
 
             base.Draw(gameTime);

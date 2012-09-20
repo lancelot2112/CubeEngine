@@ -30,9 +30,9 @@ namespace CubeEngine.Basic
         static int xBlocksLoadRadius = 32;
         static int yBlocksLoadRadius = 32;
         static int zBlocksLoadRadius = 32;
-        static int xChunksLoadRadius = xBlocksLoadRadius / Chunk.CHUNK_SIZE;
-        static int yChunksLoadRadius = yBlocksLoadRadius / Chunk.CHUNK_SIZE;
-        static int zChunksLoadRadius = zBlocksLoadRadius / Chunk.CHUNK_SIZE;
+        static int xChunksLoadRadius = xBlocksLoadRadius / Chunk.SIZE_X;
+        static int yChunksLoadRadius = yBlocksLoadRadius / Chunk.SIZE_Y;
+        static int zChunksLoadRadius = zBlocksLoadRadius / Chunk.SIZE_Z;
         static int xChunksBuildRadius = xChunksLoadRadius - 1;
         static int yChunksBuildRadius = yChunksLoadRadius - 1;
         static int zChunksBuildRadius = zChunksLoadRadius - 1;

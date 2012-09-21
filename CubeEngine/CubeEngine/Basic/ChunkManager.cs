@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Microsoft.Xna.Framework.Graphics;
+using Microsoft.Xna.Framework;
 
 namespace CubeEngine.Basic
 {
@@ -16,20 +18,14 @@ namespace CubeEngine.Basic
     /// </summary>
     public class ChunkManager
     {
-        private Dictionary<int,Chunk> m_Chunks;
-        public List<Chunk> ChunksLoading;
-        public List<Chunk> ChunksBuilding;
-        public List<Chunk> ChunksRebuilding;
-        public List<Chunk> ChunksUnloading;
-        public List<Chunk> ChunksVisible;
-        public List<Chunk> ChunksCulled;
+        private GraphicsDevice m_Graphics;
 
         /// <summary>
         /// Configurable settings to set how far to load blocks.
         /// </summary>
-        static int xBlocksLoadRadius = 32;
-        static int yBlocksLoadRadius = 32;
-        static int zBlocksLoadRadius = 32;
+        static int xBlocksLoadRadius = 256;
+        static int yBlocksLoadRadius = 128;
+        static int zBlocksLoadRadius = 256;
         static int xChunksLoadRadius = xBlocksLoadRadius / Chunk.SIZE_X;
         static int yChunksLoadRadius = yBlocksLoadRadius / Chunk.SIZE_Y;
         static int zChunksLoadRadius = zBlocksLoadRadius / Chunk.SIZE_Z;
@@ -37,29 +33,60 @@ namespace CubeEngine.Basic
         static int yChunksBuildRadius = yChunksLoadRadius - 1;
         static int zChunksBuildRadius = zChunksLoadRadius - 1;
 
+        private Dictionary<int, Chunk> m_Chunks;
+        private Chunk[, ,] m_ChunksArray;
+        public List<Chunk> ChunksBuilding;
+        public List<Chunk> ChunksRebuilding;
+        public List<Chunk> ChunksUnloading;
+        public List<Chunk> ChunksToCull;
+        public List<Chunk> ChunksVisible;
 
-
-        public ChunkManager()
+        public ChunkManager(GraphicsDevice graphics)
         {
+            m_Graphics = graphics;
+
             m_Chunks = new Dictionary<int,Chunk>();
-            ChunksLoading = new List<Chunk>();
+            m_ChunksArray = new Chunk[xChunksLoadRadius * 2 + 1, yChunksLoadRadius * 2 + 1, zChunksLoadRadius * 2 + 1];
             ChunksBuilding = new List<Chunk>();
             ChunksRebuilding = new List<Chunk>();
             ChunksUnloading = new List<Chunk>();
+            ChunksToCull = new List<Chunk>();
             ChunksVisible = new List<Chunk>();
-            ChunksCulled = new List<Chunk>();
+            LoadChunks();
         }
 
         public void Update(float dt)
         {
-            LoadChunks();
+            //LoadChunks();
             BuildChunkVertices();
             RebuildChunkVertices();
-            UnloadChunks();
+            UnloadChunks(false);
         }
 
         public void LoadChunks()
         {
+            float offsetX;
+            float offsetY;
+            float offsetZ;
+            Chunk newChunk;
+            for (byte x = 0; x < xChunksLoadRadius; x++)
+            {
+                offsetX = x * Chunk.SIZE_X;
+                for (byte y = 0; y < yChunksLoadRadius; y++)
+                {
+                    offsetY = y * Chunk.SIZE_Y;
+                    for (byte z = 0; z < zChunksLoadRadius; z++)
+                    {
+                        offsetZ = z * Chunk.SIZE_Z;
+                        newChunk = new Chunk();
+                        Matrix.CreateTranslation(offsetX, offsetY, offsetZ, out newChunk.WorldMatrix);
+                        newChunk.BuildVertices(m_Graphics);
+                        ChunksVisible.Add(newChunk);
+                        if (m_ChunksArray[x, y, z] != null) ChunksUnloading.Add(m_ChunksArray[x, y, z]);
+                        m_ChunksArray[x, y, z] = newChunk;
+                    }
+                }
+            }
         }
 
         public void BuildChunkVertices()
@@ -78,8 +105,16 @@ namespace CubeEngine.Basic
         {
         }
 
-        public void UnloadChunks()
+        public void UnloadChunks(bool closing)
         {
+            if (!closing)
+            {
+                for (int i = 0; i < ChunksUnloading.Count; i++)
+                {
+                    ChunksUnloading[i].Dispose();
+                }
+            }
         }
+
     }
 }

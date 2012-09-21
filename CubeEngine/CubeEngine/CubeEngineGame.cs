@@ -24,7 +24,7 @@ namespace CubeEngine
     {
         GraphicsDeviceManager graphics;
         DebugManager debug;
-        Chunk chunk;
+        ChunkManager chunkManager;
         XerInput input;
         DeltaFreeCamera camera;
         BasicEffect effect;
@@ -45,10 +45,8 @@ namespace CubeEngine
         /// </summary>
         protected override void Initialize()
         {
-            input = new XerInput(this);
-            chunk = new Chunk();
+            input = new XerInput(this);            
             camera = new DeltaFreeCamera(input, GraphicsDevice);
-
             base.Initialize();
         }
 
@@ -58,11 +56,9 @@ namespace CubeEngine
         /// </summary>
         protected override void LoadContent()
         {
-            chunk.BuildVertices(graphics.GraphicsDevice);
-
             effect = new BasicEffect(GraphicsDevice);
             effect.VertexColorEnabled = true;
-
+            chunkManager = new ChunkManager(GraphicsDevice);
             currentRaster = RasterizerState.CullCounterClockwise;
 
             // TODO: use this.Content to load your game content here
@@ -73,8 +69,7 @@ namespace CubeEngine
         /// all content.
         /// </summary>
         protected override void UnloadContent()
-        {
-            chunk.SolidVertexBuffer.Dispose();
+        {            
             // TODO: Unload any non ContentManager content here
         }
 
@@ -90,9 +85,10 @@ namespace CubeEngine
 
             if(input.Keyboard.F2JustPressed) 
             {
+                RasterizerState previous = currentRaster;
                 currentRaster = new RasterizerState();
-                currentRaster.CullMode = GraphicsDevice.RasterizerState.FillMode == FillMode.Solid ? CullMode.None : CullMode.CullCounterClockwiseFace;
-                currentRaster.FillMode = GraphicsDevice.RasterizerState.FillMode == FillMode.Solid ? FillMode.WireFrame : FillMode.Solid;                
+                currentRaster.CullMode = previous.FillMode == FillMode.Solid ? CullMode.None : CullMode.CullCounterClockwiseFace;
+                currentRaster.FillMode = previous.FillMode == FillMode.Solid ? FillMode.WireFrame : FillMode.Solid;                
             }
             // TODO: Add your update logic here
 
@@ -112,14 +108,22 @@ namespace CubeEngine
             effect.Projection = camera.Projection;
             effect.View = camera.View;
 
-            chunk.WorldMatrix = chunk.WorldMatrix * camera.InverseTranslation;
-            effect.World = chunk.WorldMatrix;
-            
+            Chunk chunk;
+            for (int i = 0; i < chunkManager.ChunksVisible.Count; i++)
+            {
+                chunk = chunkManager.ChunksVisible[i];
+                chunk.WorldMatrix = chunk.WorldMatrix * camera.InverseTranslation;
+                effect.World = chunk.WorldMatrix;
 
-            GraphicsDevice.SetVertexBuffer(chunk.SolidVertexBuffer);
 
-            effect.CurrentTechnique.Passes[0].Apply();
-            GraphicsDevice.DrawPrimitives(PrimitiveType.TriangleList, 0, chunk.SolidVertexBuffer.VertexCount / 3);
+                GraphicsDevice.SetVertexBuffer(chunk.SolidVertexBuffer);
+
+                foreach (EffectPass pass in effect.CurrentTechnique.Passes) 
+                {
+                    pass.Apply();
+                    GraphicsDevice.DrawPrimitives(PrimitiveType.TriangleList, 0, chunk.SolidVertexBuffer.VertexCount / 3);
+                }
+            }
             // TODO: Add your drawing code here
 
             base.Draw(gameTime);

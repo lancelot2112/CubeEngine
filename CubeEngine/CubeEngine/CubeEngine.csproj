@@ -108,6 +108,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Basic\Chunk.cs" />
+    <Compile Include="Basic\ChunkArray.cs" />
     <Compile Include="Basic\ChunkManager.cs" />
     <Compile Include="Basic\Cube.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

@@ -19,8 +19,12 @@ namespace CubeEngine.Basic
  
         private Cube[,,] m_Cubes;
         public SuperGroupCoords Coords;
-        public ChunkHash Hash;
+        public ChunkIndex Index;
         public Matrix WorldMatrix;
+
+        //Statisitics
+        public int SolidBlocks;
+        public int SidesRenderable;
 
         //Render Members
         public bool AllowRender;
@@ -38,7 +42,12 @@ namespace CubeEngine.Basic
                 for (byte y = 0; y < SIZE_Y; y++)
                     for (byte z = 0; z < SIZE_Z; z++)
                     {
-                        m_Cubes[x, y, z].Type = CubeType.Dirt;
+                        if (XerUtilities.Common.MathLib.NextRandom() > 0.5f)
+                        {
+                            m_Cubes[x, y, z].Type = CubeType.Dirt;
+                            SolidBlocks += 1;
+                        }
+                        else m_Cubes[x, y, z].Type = CubeType.Air;
                     }
 
             solidVertexList = new List<VertexPositionColor>();
@@ -97,7 +106,8 @@ namespace CubeEngine.Basic
                     for (byte z = 0; z < SIZE_Z; z++)
                     {
                         current = m_Cubes[x, y, z];
-                        if (current.IsTransparent()) vertexList = transparentVertexList;
+                        if (!current.IsRenderable()) continue;
+                        else if (current.IsTransparent()) vertexList = transparentVertexList;
                         else vertexList = solidVertexList;
 
                         offset.X = x;
@@ -116,6 +126,8 @@ namespace CubeEngine.Basic
                             vertexList.Add(new VertexPositionColor(Cube.CORNER_NNN + offset, Color.Green));
                             vertexList.Add(new VertexPositionColor(Cube.CORNER_NPP + offset, Color.Green));
                             vertexList.Add(new VertexPositionColor(Cube.CORNER_NNP + offset, Color.Green));
+
+                            SidesRenderable += 1;
                         }
 
                         //+x
@@ -130,6 +142,8 @@ namespace CubeEngine.Basic
                             vertexList.Add(new VertexPositionColor(Cube.CORNER_PNP + offset, Color.Blue));
                             vertexList.Add(new VertexPositionColor(Cube.CORNER_PPN + offset, Color.Blue));
                             vertexList.Add(new VertexPositionColor(Cube.CORNER_PNN + offset, Color.Blue));
+
+                            SidesRenderable += 1;
                         }
 
                         //-y
@@ -144,6 +158,8 @@ namespace CubeEngine.Basic
                             vertexList.Add(new VertexPositionColor(Cube.CORNER_NNN + offset, Color.Orange));
                             vertexList.Add(new VertexPositionColor(Cube.CORNER_PNP + offset, Color.Orange));
                             vertexList.Add(new VertexPositionColor(Cube.CORNER_PNN + offset, Color.Orange));
+
+                            SidesRenderable += 1;
                         }
 
                         //+y
@@ -158,6 +174,8 @@ namespace CubeEngine.Basic
                             vertexList.Add(new VertexPositionColor(Cube.CORNER_NPP + offset, Color.Yellow));
                             vertexList.Add(new VertexPositionColor(Cube.CORNER_PPN + offset, Color.Yellow));
                             vertexList.Add(new VertexPositionColor(Cube.CORNER_PPP + offset, Color.Yellow));
+
+                            SidesRenderable += 1;
                         }
 
                         //-z
@@ -172,6 +190,8 @@ namespace CubeEngine.Basic
                             vertexList.Add(new VertexPositionColor(Cube.CORNER_PNN + offset, Color.Violet));
                             vertexList.Add(new VertexPositionColor(Cube.CORNER_NPN + offset, Color.Violet));
                             vertexList.Add(new VertexPositionColor(Cube.CORNER_NNN + offset, Color.Violet));
+
+                            SidesRenderable += 1;
                         }
 
                         //+z
@@ -186,6 +206,8 @@ namespace CubeEngine.Basic
                             vertexList.Add(new VertexPositionColor(Cube.CORNER_NNP + offset, Color.Red));
                             vertexList.Add(new VertexPositionColor(Cube.CORNER_PPP + offset, Color.Red));
                             vertexList.Add(new VertexPositionColor(Cube.CORNER_PNP + offset, Color.Red));
+
+                            SidesRenderable += 1;
                         }
                     }
 
@@ -198,7 +220,7 @@ namespace CubeEngine.Basic
 
             if (transparentVertexList.Count > 0)
             {
-                TransparentVertexBuffer = new VertexBuffer(graphics, typeof(VertexPositionColor), solidVertexList.Count, BufferUsage.None);
+                TransparentVertexBuffer = new VertexBuffer(graphics, typeof(VertexPositionColor), transparentVertexList.Count, BufferUsage.None);
                 TransparentVertexBuffer.SetData<VertexPositionColor>(transparentVertexList.ToArray());
                 transparentVertexList.Clear();
             }
@@ -229,6 +251,46 @@ namespace CubeEngine.Basic
             this.REL_X = relX;
             this.REL_Y = relY;
             this.REL_Z = relZ;
+        }
+
+    }
+
+    //TODO: Possibly turn into an all inclusive wrap around 3d array class that will handle this internally.
+    public struct ChunkIndex
+    {
+        public int X;
+        public int Y;
+        public int Z;
+
+        public ChunkIndex(int x, int y, int z)
+        {
+            X = x;
+            Y = y;
+            Z = z;
+        }
+
+        public int AddX(int val)
+        {
+            int sum = X + val;
+            if (sum > ChunkManager.xChunkNumber) sum -= ChunkManager.xChunkNumber;
+            else if (sum < 0) sum += ChunkManager.xChunkNumber;
+            return sum;
+        }
+
+        public int AddY(int val)
+        {
+            int sum = Y + val;
+            if (sum >= ChunkManager.yChunkNumber) sum -= ChunkManager.yChunkNumber;
+            else if (sum < 0) sum += ChunkManager.yChunkNumber;
+            return sum;
+        }
+
+        public int AddZ(int val)
+        {
+            int sum = Z + val;
+            if (sum >= ChunkManager.zChunkNumber) sum -= ChunkManager.zChunkNumber;
+            else if (sum < 0) sum += ChunkManager.zChunkNumber;
+            return sum;
         }
 
     }

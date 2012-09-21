@@ -57,6 +57,16 @@ namespace CubeEngine.Basic
             else return false;
         }
 
+        public bool IsRenderable()
+        {
+            if (Type == CubeType.Air ||
+                Type == CubeType.NULL)
+            {
+                return false;
+            }
+            else return true;
+        }
+
         //public static Vector3 CORNER_PPP = new Vector3(0.5f, 0.5f, 0.5f);
         //public static Vector3 CORNER_PPN = new Vector3(0.5f, 0.5f, -0.5f);
         //public static Vector3 CORNER_PNP = new Vector3(0.5f, -0.5f, 0.5f);

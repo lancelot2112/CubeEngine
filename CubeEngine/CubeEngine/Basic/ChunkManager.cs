@@ -23,18 +23,28 @@ namespace CubeEngine.Basic
         /// <summary>
         /// Configurable settings to set how far to load blocks.
         /// </summary>
-        static int xBlocksLoadRadius = 256;
-        static int yBlocksLoadRadius = 128;
-        static int zBlocksLoadRadius = 256;
-        static int xChunksLoadRadius = xBlocksLoadRadius / Chunk.SIZE_X;
-        static int yChunksLoadRadius = yBlocksLoadRadius / Chunk.SIZE_Y;
-        static int zChunksLoadRadius = zBlocksLoadRadius / Chunk.SIZE_Z;
-        static int xChunksBuildRadius = xChunksLoadRadius - 1;
-        static int yChunksBuildRadius = yChunksLoadRadius - 1;
-        static int zChunksBuildRadius = zChunksLoadRadius - 1;
+        //public static int xBlocksLoadRadius = 0;
+        //public static int yBlocksLoadRadius = 0;
+        //public static int zBlocksLoadRadius = 0;
+        //public static int xChunksLoadRadius = xBlocksLoadRadius / Chunk.SIZE_X;
+        //public static int yChunksLoadRadius = yBlocksLoadRadius / Chunk.SIZE_Y;
+        //public static int zChunksLoadRadius = zBlocksLoadRadius / Chunk.SIZE_Z;
+        //public static int xChunkNumber = 2 * xChunksLoadRadius + 1;
+        //public static int yChunkNumber = 2 * yChunksLoadRadius + 1;
+        //public static int zChunkNumber = 2 * zChunksLoadRadius + 1;
+        //public static int xChunksBuildRadius = xChunksLoadRadius - 1;
+        //public static int yChunksBuildRadius = yChunksLoadRadius - 1;
+        //public static int zChunksBuildRadius = zChunksLoadRadius - 1;
+
+        public static int xChunkNumber = 3;
+        public static int yChunkNumber = 1;
+        public static int zChunkNumber = 3;
+        public static int xOffset = (int)(xChunkNumber * 0.5f);
+        public static int yOffset = (int)(yChunkNumber * 0.5f);
+        public static int zOffset = (int)(zChunkNumber * 0.5f);
 
         private Dictionary<int, Chunk> m_Chunks;
-        private Chunk[, ,] m_ChunksArray;
+        private ChunkStorage m_ChunkStorage;
         public List<Chunk> ChunksBuilding;
         public List<Chunk> ChunksRebuilding;
         public List<Chunk> ChunksUnloading;
@@ -46,19 +56,21 @@ namespace CubeEngine.Basic
             m_Graphics = graphics;
 
             m_Chunks = new Dictionary<int,Chunk>();
-            m_ChunksArray = new Chunk[xChunksLoadRadius * 2 + 1, yChunksLoadRadius * 2 + 1, zChunksLoadRadius * 2 + 1];
+            m_ChunkStorage = new ChunkStorage(xChunkNumber, yChunkNumber, zChunkNumber);
             ChunksBuilding = new List<Chunk>();
             ChunksRebuilding = new List<Chunk>();
             ChunksUnloading = new List<Chunk>();
             ChunksToCull = new List<Chunk>();
             ChunksVisible = new List<Chunk>();
+
             LoadChunks();
+            BuildChunkVertices();
         }
 
         public void Update(float dt)
         {
             //LoadChunks();
-            BuildChunkVertices();
+            //BuildChunkVertices();
             RebuildChunkVertices();
             UnloadChunks(false);
         }
@@ -69,21 +81,20 @@ namespace CubeEngine.Basic
             float offsetY;
             float offsetZ;
             Chunk newChunk;
-            for (byte x = 0; x < xChunksLoadRadius; x++)
+            for (int x = 0; x < xChunkNumber; x++)
             {
-                offsetX = x * Chunk.SIZE_X;
-                for (byte y = 0; y < yChunksLoadRadius; y++)
+                offsetX = (x - xOffset) * Chunk.SIZE_X;
+                for (int y = 0; y < yChunkNumber; y++)
                 {
-                    offsetY = y * Chunk.SIZE_Y;
-                    for (byte z = 0; z < zChunksLoadRadius; z++)
+                    offsetY = (y - yOffset) * Chunk.SIZE_Y;
+                    for (int z = 0; z < zChunkNumber; z++)
                     {
-                        offsetZ = z * Chunk.SIZE_Z;
+                        offsetZ = (z - zOffset) * Chunk.SIZE_Z;
                         newChunk = new Chunk();
+                        newChunk.Index = new ChunkIndex(x, y, z);
                         Matrix.CreateTranslation(offsetX, offsetY, offsetZ, out newChunk.WorldMatrix);
-                        newChunk.BuildVertices(m_Graphics);
-                        ChunksVisible.Add(newChunk);
-                        if (m_ChunksArray[x, y, z] != null) ChunksUnloading.Add(m_ChunksArray[x, y, z]);
-                        m_ChunksArray[x, y, z] = newChunk;
+                        if (m_ChunkStorage.Chunks[x, y, z] != null) ChunksUnloading.Add(m_ChunkStorage.Chunks[x, y, z]);
+                        m_ChunkStorage.Chunks[x, y, z] = newChunk;
                     }
                 }
             }
@@ -91,6 +102,29 @@ namespace CubeEngine.Basic
 
         public void BuildChunkVertices()
         {
+            Chunk curr;
+            Chunk posX = null;
+            Chunk negX = null;
+            Chunk posY = null;
+            Chunk negY = null;
+            Chunk posZ = null;
+            Chunk negZ = null;
+            for (int x = 0; x < xChunkNumber; x++)
+                for (int y = 0; y < yChunkNumber; y++)
+                    for (int z = 0; z < zChunkNumber; z++)
+                    {
+                        curr = m_ChunkStorage.Chunks[x, y, z];
+                        //negX = m_ChunkStorage.GetXLesser(x, y, z);
+                        //posX = m_ChunkStorage.GetXGreater(x, y, z);
+                        //negY = m_ChunkStorage.GetYLesser(x, y, z);
+                        //posY = m_ChunkStorage.GetYGreater(x, y, z);
+                        //negZ = m_ChunkStorage.GetZLesser(x, y, z);
+                        //posZ = m_ChunkStorage.GetZGreater(x, y, z);
+
+                        curr.BuildVertices(m_Graphics, posX, negX, posY, negY, posZ, negZ);
+
+                        if (curr.SolidVertexBuffer != null || curr.TransparentVertexBuffer != null) ChunksVisible.Add(curr);
+                    }
         }
 
         public void RebuildChunkVertices()

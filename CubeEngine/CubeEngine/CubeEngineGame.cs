@@ -60,6 +60,7 @@ namespace CubeEngine
             effect.VertexColorEnabled = true;
             chunkManager = new ChunkManager(GraphicsDevice);
             currentRaster = RasterizerState.CullCounterClockwise;
+;
 
             // TODO: use this.Content to load your game content here
         }
@@ -88,7 +89,7 @@ namespace CubeEngine
                 RasterizerState previous = currentRaster;
                 currentRaster = new RasterizerState();
                 currentRaster.CullMode = previous.FillMode == FillMode.Solid ? CullMode.None : CullMode.CullCounterClockwiseFace;
-                currentRaster.FillMode = previous.FillMode == FillMode.Solid ? FillMode.WireFrame : FillMode.Solid;                
+                currentRaster.FillMode = previous.FillMode == FillMode.Solid ? FillMode.WireFrame : FillMode.Solid;  
             }
             // TODO: Add your update logic here
 
@@ -102,11 +103,15 @@ namespace CubeEngine
         protected override void Draw(GameTime gameTime)
         {
             GraphicsDevice.RasterizerState = currentRaster;
+            GraphicsDevice.DepthStencilState = DepthStencilState.Default;
 
             GraphicsDevice.Clear(Color.CornflowerBlue);
 
             effect.Projection = camera.Projection;
             effect.View = camera.View;
+            int VerticesDrawn = 0;
+            int SidesDrawn = 0;
+            int CubesDrawn = 0;
 
             Chunk chunk;
             for (int i = 0; i < chunkManager.ChunksVisible.Count; i++)
@@ -115,15 +120,23 @@ namespace CubeEngine
                 chunk.WorldMatrix = chunk.WorldMatrix * camera.InverseTranslation;
                 effect.World = chunk.WorldMatrix;
 
-
                 GraphicsDevice.SetVertexBuffer(chunk.SolidVertexBuffer);
 
                 foreach (EffectPass pass in effect.CurrentTechnique.Passes) 
                 {
                     pass.Apply();
                     GraphicsDevice.DrawPrimitives(PrimitiveType.TriangleList, 0, chunk.SolidVertexBuffer.VertexCount / 3);
+
+                    VerticesDrawn += chunk.SolidVertexBuffer.VertexCount;
+                    SidesDrawn += chunk.SidesRenderable;
+                    CubesDrawn += chunk.SolidBlocks;
                 }
             }
+
+            debug.DebugDisplay.AddLine(1,"Vertices Drawn: " + VerticesDrawn.ToString());
+            debug.DebugDisplay.AddLine(2,"Sides Drawn: " + SidesDrawn.ToString());
+            debug.DebugDisplay.AddLine(3,"Cubes Drawn: " + CubesDrawn.ToString());
+            
             // TODO: Add your drawing code here
 
             base.Draw(gameTime);

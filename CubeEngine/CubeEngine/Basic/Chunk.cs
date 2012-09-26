@@ -13,365 +13,135 @@ namespace CubeEngine.Basic
     /// </summary>
     public class Chunk
     {
-        public const byte SIZE_X = 64;
-        public const byte SIZE_Y = 64;
-        public const byte SIZE_Z = 64;
- 
-        private Cube[,,] m_Cubes;
-        public SuperGroupCoords Coords;
-        public ChunkIndex Index;
-        public Matrix WorldMatrix;
+        public const int WIDTH = 16;
+        public const int HEIGHT = 128;
+        public const int DEPENDENCIES_MET_FLAG = 15;
 
-        //Statisitics
-        public int SolidBlocks;
-        public int SidesRenderable;
+        /// <summary>
+        ///  1: +x
+        ///  2: -x
+        ///  4: +z
+        ///  8: -z
+        /// </summary>
+        public byte DependenciesFlag;
+        public int XIndex;
+        public int ZIndex;
 
-        //Render Members
-        public bool AllowRender;
-        private List<VertexPositionColor> solidVertexList;
-        private List<VertexPositionColor> transparentVertexList;
-        public VertexBuffer SolidVertexBuffer;
-        public VertexBuffer TransparentVertexBuffer;
+        public ChunkCoords Coords;
+        public Vector3 LocalPosition;
+        public bool PositionUpdated;
 
+        public List<ChunkSubMesh> Meshes;
+        public bool ChangedSinceLoad;
+        public bool Built;
+        public bool Empty;
 
-        public Chunk()
+        private Cube[, ,] m_cubes;
+        
+
+        public Chunk(ChunkManager manager, ChunkCoords coords)
         {
-            m_Cubes = new Cube[SIZE_X, SIZE_Y, SIZE_Z];
+            manager.ChunkLoadedEvent += CheckDependence;
+            Coords = coords;
+            LocalPosition = new Vector3(coords.X * WIDTH, 0f, coords.Z * WIDTH);
+            m_cubes = new Cube[WIDTH, HEIGHT, WIDTH];
+            Meshes = new List<ChunkSubMesh>();
 
-            for (byte x = 0; x < SIZE_X; x++)
-                for (byte y = 0; y < SIZE_Y; y++)
-                    for (byte z = 0; z < SIZE_Z; z++)
-                    {
-                        if (XerUtilities.Common.MathLib.NextRandom() > 0.5f)
-                        {
-                            m_Cubes[x, y, z].Type = CubeType.Dirt;
-                            SolidBlocks += 1;
-                        }
-                        else m_Cubes[x, y, z].Type = CubeType.Air;
-                    }
-
-            solidVertexList = new List<VertexPositionColor>();
-            transparentVertexList = new List<VertexPositionColor>();
-
-            WorldMatrix = Matrix.Identity;
+            ChangedSinceLoad = false;
+            Built = false;
+            Empty = true;
+            PositionUpdated = false;
         }
 
-        public void SetCube(byte x, byte y, byte z, ref Cube cube)
+        public void Update(float dt, Vector3 deltaPosition)
         {
-            if (InChunk(x, y, z)) m_Cubes[x, y, z] = cube;
+            LocalPosition -= deltaPosition;
         }
 
-        public bool GetCube(byte x, byte y, byte z, out Cube cube)
+        public void SetCube(int x, int y, int z, ref Cube cube)
+        {
+            if (InChunk(x, y, z)) m_cubes[x, y, z] = cube;
+        }
+
+        public bool GetCube(int x, int y, int z, out Cube cube)
         {
             if (InChunk(x, y, z))
             {
-                cube = m_Cubes[x, y, z];
+                cube = m_cubes[x, y, z];
                 return true;
             }
             else
             {
-                cube = Cube.NULL;
+                cube = Cube.AIR;
                 return false;
             }
         }
 
-        public Cube GetCube(byte x, byte y, byte z)
+        public Cube GetCube(int x, int y, int z)
         {
-            if (InChunk(x, y, z)) return m_Cubes[x, y, z];
-            else return Cube.NULL;
+            if (InChunk(x, y, z)) return m_cubes[x, y, z];
+            else return Cube.AIR;
         }
 
-        public bool InChunk(byte x, byte y, byte z)
+        public void CheckDependence(ChunkManager manager, Chunk chunk)
+        {
+            if (!Built)
+            {
+                DependenciesFlag |= Coords.Neighbors(chunk.Coords);
+                if (DependenciesFlag == 15 && !manager.ChunksToDraw.Contains(this) && !Built) manager.ChunksToBuild.Enqueue(this);
+            }
+        }
+
+        public bool InChunk(int x, int y, int z)
         {
 
-            if (x < 0 || x >= SIZE_X)
+            if (x < 0 || x >= WIDTH)
                 return false;
-            if (y < 0 || y >= SIZE_Y)
+            if (y < 0 || y >= HEIGHT)
                 return false;
-            if (z < 0 || z >= SIZE_Z)
+            if (z < 0 || z >= WIDTH)
                 return false;
 
             return true;
         }
 
-        public void BuildVertices(GraphicsDevice graphics, Chunk posX = null, Chunk negX = null, Chunk posY = null, Chunk negY = null, Chunk posZ = null, Chunk negZ = null)
+        public void BuildVertices(GraphicsDevice graphics, Chunk posX, Chunk negX, Chunk posZ, Chunk negZ)
         {
-            Cube neighbor;
-            Cube current;
-            List<VertexPositionColor> vertexList;
-            Vector3 offset;
-
-            for(byte x = 0; x < SIZE_X; x++)
-                for(byte y = 0; y < SIZE_Y; y++)
-                    for (byte z = 0; z < SIZE_Z; z++)
-                    {
-                        current = m_Cubes[x, y, z];
-                        if (!current.IsRenderable()) continue;
-                        else if (current.IsTransparent()) vertexList = transparentVertexList;
-                        else vertexList = solidVertexList;
-
-                        offset.X = x;
-                        offset.Y = y;
-                        offset.Z = z;
-
-                        //-x
-                        if (x == 0) neighbor = (negX != null) ? negX.GetCube(SIZE_X - 1, y, z) : Cube.NULL;
-                        else neighbor = m_Cubes[x - 1, y, z];
-
-                        if (neighbor.IsTransparent())
-                        {
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NPN + offset, Color.Green));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NPP + offset, Color.Green));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NNN + offset, Color.Green));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NNN + offset, Color.Green));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NPP + offset, Color.Green));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NNP + offset, Color.Green));
-
-                            SidesRenderable += 1;
-                        }
-
-                        //+x
-                        if (x == SIZE_X - 1) neighbor = (posX != null) ? posX.GetCube(0, y, z) : Cube.NULL;
-                        else neighbor = m_Cubes[x + 1, y, z];
-
-                        if (neighbor.IsTransparent())
-                        {
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PPP + offset, Color.Blue));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PPN + offset, Color.Blue));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PNP + offset, Color.Blue));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PNP + offset, Color.Blue));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PPN + offset, Color.Blue));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PNN + offset, Color.Blue));
-
-                            SidesRenderable += 1;
-                        }
-
-                        //-y
-                        if (y == 0) neighbor = (negY != null) ? negY.GetCube(x, SIZE_Y - 1, z) : Cube.NULL;
-                        else neighbor = m_Cubes[x, y - 1, z];
-
-                        if (neighbor.IsTransparent())
-                        {
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NNP + offset, Color.Orange));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PNP + offset, Color.Orange));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NNN + offset, Color.Orange));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NNN + offset, Color.Orange));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PNP + offset, Color.Orange));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PNN + offset, Color.Orange));
-
-                            SidesRenderable += 1;
-                        }
-
-                        //+y
-                        if (y == SIZE_Y - 1) neighbor = (posY != null) ? posY.GetCube(x, 0, z) : Cube.NULL;
-                        else neighbor = m_Cubes[x, y + 1, z];
-
-                        if (neighbor.IsTransparent())
-                        {
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NPN + offset, Color.Yellow));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PPN + offset, Color.Yellow));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NPP + offset, Color.Yellow));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NPP + offset, Color.Yellow));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PPN + offset, Color.Yellow));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PPP + offset, Color.Yellow));
-
-                            SidesRenderable += 1;
-                        }
-
-                        //-z
-                        if (z == 0) neighbor = (negZ != null) ? negZ.GetCube(x, y, SIZE_Z - 1) : Cube.NULL;
-                        else neighbor = m_Cubes[x, y, z - 1];
-
-                        if (neighbor.IsTransparent())
-                        {                            
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PPN + offset, Color.Violet));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NPN + offset, Color.Violet));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PNN + offset, Color.Violet));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PNN + offset, Color.Violet));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NPN + offset, Color.Violet));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NNN + offset, Color.Violet));
-
-                            SidesRenderable += 1;
-                        }
-
-                        //+z
-                        if (z == SIZE_Z - 1) neighbor = (posZ != null) ? posZ.GetCube(x, y, 0) : Cube.NULL;
-                        else neighbor = m_Cubes[x, y, z + 1];
-
-                        if (neighbor.IsTransparent())
-                        {
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NPP + offset, Color.Red));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PPP + offset, Color.Red));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NNP + offset, Color.Red));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NNP + offset, Color.Red));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PPP + offset, Color.Red));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PNP + offset, Color.Red));
-
-                            SidesRenderable += 1;
-                        }
-                    }
-
-            if (solidVertexList.Count > 0)
+            ChunkSubMesh currentMesh;
+            int i = 0;
+            while(i < HEIGHT)
             {
-                SolidVertexBuffer = new VertexBuffer(graphics, typeof(VertexPositionColor), solidVertexList.Count, BufferUsage.None);
-                SolidVertexBuffer.SetData<VertexPositionColor>(solidVertexList.ToArray());
-                solidVertexList.Clear();
+                if (posX.PositionUpdated) LocalPosition = posX.LocalPosition - Vector3.Right * WIDTH;
+                else if (posZ.PositionUpdated) LocalPosition = posZ.LocalPosition - Vector3.Forward * WIDTH;
+                else if (negX.PositionUpdated) LocalPosition = negX.LocalPosition + Vector3.Right * WIDTH;
+                else if (negZ.PositionUpdated) LocalPosition = negZ.LocalPosition + Vector3.Forward * WIDTH;
+                PositionUpdated = true;
+
+                currentMesh = new ChunkSubMesh(i);
+                currentMesh.BuildVertices(graphics, m_cubes, posX, negX, posZ, negZ);
+                if (!currentMesh.Empty) Meshes.Add(currentMesh);
+                i += ChunkSubMesh.SIZE_Z;
             }
 
-            if (transparentVertexList.Count > 0)
-            {
-                TransparentVertexBuffer = new VertexBuffer(graphics, typeof(VertexPositionColor), transparentVertexList.Count, BufferUsage.None);
-                TransparentVertexBuffer.SetData<VertexPositionColor>(transparentVertexList.ToArray());
-                transparentVertexList.Clear();
-            }
+            Built = true;
+        }
+        public bool LoadFromDisk()
+        {
+            return false;
+        }
+
+        public void SaveToDisk()
+        {
         }
 
         public void Dispose()
         {
-            SolidVertexBuffer.Dispose();
-            TransparentVertexBuffer.Dispose();
+            for (int i = 0; i < Meshes.Count; i++)
+            {
+                Meshes[i].Dispose();
+            }
         }
     }
 
-    /// <summary>
-    /// ChunkCoords store the relative positions of a supergroup (256x256x256) of chunks to allow for much bigger worlds while using relative coordinates.  Each supergroup has
-    /// chunks with x,y,z in the set [0,255] and by taking the difference between the REL coordinates you can determine the spatial relation of the supergroups.  For instance
-    /// REL_X1 = 1 and REL_X2 = 1.001, since 1.001-1 equals a positive number equivalent to the value of SHIFT then supergroup 2 is the supergroup just to the right of supergroup
-    /// 1.  Doing it this way allows for huge worlds (much bigger than will every be necessary).
-    /// </summary>
-    public struct SuperGroupCoords
-    {
-        public static double SHIFT = 1d;
-        public double REL_X;
-        public double REL_Y;
-        public double REL_Z;
 
-        public SuperGroupCoords(double relX, double relY, double relZ)
-        {
-            this.REL_X = relX;
-            this.REL_Y = relY;
-            this.REL_Z = relZ;
-        }
-
-    }
-
-    //TODO: Possibly turn into an all inclusive wrap around 3d array class that will handle this internally.
-    public struct ChunkIndex
-    {
-        public int X;
-        public int Y;
-        public int Z;
-
-        public ChunkIndex(int x, int y, int z)
-        {
-            X = x;
-            Y = y;
-            Z = z;
-        }
-
-        public int AddX(int val)
-        {
-            int sum = X + val;
-            if (sum > ChunkManager.xChunkNumber) sum -= ChunkManager.xChunkNumber;
-            else if (sum < 0) sum += ChunkManager.xChunkNumber;
-            return sum;
-        }
-
-        public int AddY(int val)
-        {
-            int sum = Y + val;
-            if (sum >= ChunkManager.yChunkNumber) sum -= ChunkManager.yChunkNumber;
-            else if (sum < 0) sum += ChunkManager.yChunkNumber;
-            return sum;
-        }
-
-        public int AddZ(int val)
-        {
-            int sum = Z + val;
-            if (sum >= ChunkManager.zChunkNumber) sum -= ChunkManager.zChunkNumber;
-            else if (sum < 0) sum += ChunkManager.zChunkNumber;
-            return sum;
-        }
-
-    }
-
-    /// <summary>
-    /// ChunkHash is used to store the relative positions of chunks stored in memory, up to 256x256x256 chunks.
-    /// Uses a wraparound coordinate system by using byte math (ie. 256 + 1 = 0 and 0 - 1 = 256)
-    /// </summary>
-    public struct ChunkHash
-    {
-
-        public byte X;
-        public byte Y;
-        public byte Z;
-        public int Hash;
-        public ChunkHash(byte x, byte y , byte z)
-        {
-            this.X = x;
-            this.Y = y;
-            this.Z = z;
-            Hash = GetHash(x, y, z);
-        }
-
-        public override string ToString()
-        {
-            return Hash.ToString();
-        }
-
-        public static int GetHash(byte x, byte y, byte z)
-        {
-            return x + (y << 8) + (z << 16);
-        }
-
-        public int Add(byte x, byte y, byte z)
-        {
-            return Hash + x + (y << 8) + (z << 16);
-        }
-
-        public int Sub(byte x, byte y, byte z)
-        {
-            return Hash - x - (y << 8) - (z << 16);
-        }
-
-        public int AddX(byte x)
-        {
-            return Hash + x;
-        }
-
-        public int SubX(byte x)
-        {
-            return Hash - x;
-        }
-
-        public int AddY(byte y)
-        {
-            return Hash + (y << 8);
-        }
-
-        public int SubY(byte y)
-        {
-            return Hash - (y << 8);
-        }
-
-        public int AddZ(byte z)
-        {
-            return Hash + (z << 16);
-        }
-
-        public int SubZ(byte z)
-        {
-            return Hash - (z << 16);
-        }
-
-        public static ChunkHash GetCoords(int hash)
-        {
-            byte x = (byte)hash;
-            byte y = (byte)(hash>>8);
-            byte z = (byte)(hash>>16);
-            return new ChunkHash(x, y, z);
-        }
-
-
-    }
 }

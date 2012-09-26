@@ -6,21 +6,6 @@ using Microsoft.Xna.Framework;
 
 namespace CubeEngine.Basic
 {
-    // Types of cube available
-    public enum CubeType : ushort
-    {
-        NULL = 0,
-        Air,
-        Dirt,
-        Grass,
-        Rock,
-        Snow,
-        Sand,
-        TreeTrunk,
-        Leaves,
-        Water,
-        MAXIMUM
-    }
 
     [Flags]
     public enum CubeFace : byte
@@ -34,48 +19,64 @@ namespace CubeEngine.Basic
         NegZ = 32
     }
 
+    public enum CubeType : byte
+    {
+        Air,
+        Dirt,
+        Grass,
+        Stone
+    }
     // Value type defining the characteristics of a cube
     public struct Cube
     {
+        public byte Red, Green, Blue, AlphaSpecular;
+        public byte LocalRed, LocalGreen, LocalBlue, LightLevels;
         public CubeType Type;
+        public byte Other;
 
-        public Cube(CubeType cubeType)
+        public Cube(CubeType type)
         {
-            Type = cubeType;
+            this = CUBE_TYPES[(byte)type];
         }
 
-        public readonly static Cube NULL = new Cube();
+        public Cube(CubeType type, byte red, byte green, byte blue, byte alphaSpecular)
+            :this(type,red,green, blue,alphaSpecular,0,0,0,0,0) {}
+
+        public Cube(CubeType type, byte red, byte green, byte blue, byte alphaSpecular, byte localRed, byte localGreen, byte localBlue, byte lightLevels, byte other)
+        {
+            this.Type = type;
+            this.Red = red;
+            this.Blue = blue;
+            this.Green = green;
+            this.AlphaSpecular = alphaSpecular;
+            this.LocalRed = localRed;
+            this.LocalBlue = localBlue;
+            this.LocalGreen = localGreen;
+            this.LightLevels = lightLevels;
+            this.Other = other;
+        }
 
         public bool IsTransparent()
         {
-            if (Type == CubeType.Air ||
-                Type == CubeType.Water ||
-                Type == CubeType.NULL)
-            {
-                return true;
-            }
-            else return false;
+            if ((AlphaSpecular & 3) != 3) return true;
+
+            return false;
         }
 
         public bool IsRenderable()
         {
-            if (Type == CubeType.Air ||
-                Type == CubeType.NULL)
-            {
-                return false;
-            }
-            else return true;
+            if ((AlphaSpecular & 3) != 0) return true;
+
+            return false;
         }
 
-        //public static Vector3 CORNER_PPP = new Vector3(0.5f, 0.5f, 0.5f);
-        //public static Vector3 CORNER_PPN = new Vector3(0.5f, 0.5f, -0.5f);
-        //public static Vector3 CORNER_PNP = new Vector3(0.5f, -0.5f, 0.5f);
-        //public static Vector3 CORNER_PNN = new Vector3(0.5f, -0.5f, -0.5f);
-        //public static Vector3 CORNER_NPP = new Vector3(-0.5f, 0.5f, 0.5f);
-        //public static Vector3 CORNER_NPN = new Vector3(-0.5f, 0.5f, -0.5f);
-        //public static Vector3 CORNER_NNP = new Vector3(-0.5f, -0.5f, 0.5f);
-        //public static Vector3 CORNER_NNN = new Vector3(-0.5f, -0.5f, -0.5f);
-
+        public static Cube AIR = new Cube();
+        public static Cube[] CUBE_TYPES = new Cube[] 
+        { new Cube(CubeType.Air,0,0,0,0),
+            new Cube(CubeType.Dirt,139,16,19,3),
+            new Cube(CubeType.Grass,0,100,0,3),
+            new Cube(CubeType.Stone,112,138,144,3)
+        };
         public static Vector3 CORNER_PPP = new Vector3(1f, 1f, 1f);
         public static Vector3 CORNER_PPN = new Vector3(1f, 1f, 0f);
         public static Vector3 CORNER_PNP = new Vector3(1f, 0f, 1f);

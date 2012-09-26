@@ -1,1 +1,2 @@
 c:\users\lancer\documents\visual studio 2010\Projects\CubeEngine\CubeEngine\CubeEngineContent\obj\x86\Debug\ResolveAssemblyReference.cache
+C:\Users\Lancer\Dropbox\Projects\CubeEngine\CubeEngine\CubeEngineContent\obj\x86\Debug\ResolveAssemblyReference.cache

@@ -58,7 +58,7 @@ namespace CubeEngine
         {
             effect = new BasicEffect(GraphicsDevice);
             effect.VertexColorEnabled = true;
-            chunkManager = new ChunkManager(GraphicsDevice);
+            chunkManager = new ChunkManager(GraphicsDevice, new ChunkCoords(0,0,20));
             currentRaster = RasterizerState.CullCounterClockwise;
 ;
 
@@ -83,6 +83,7 @@ namespace CubeEngine
         {
             float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
             camera.Update(dt);
+            chunkManager.Update(dt, new ChunkCoords(), camera.Translation);
 
             if(input.Keyboard.F2JustPressed) 
             {
@@ -114,28 +115,33 @@ namespace CubeEngine
             int CubesDrawn = 0;
 
             Chunk chunk;
-            for (int i = 0; i < chunkManager.ChunksVisible.Count; i++)
+            ChunkSubMesh mesh;
+            for (int i = 0; i < chunkManager.ChunksToDraw.Count; i++)
             {
-                chunk = chunkManager.ChunksVisible[i];
-                chunk.WorldMatrix = chunk.WorldMatrix * camera.InverseTranslation;
-                effect.World = chunk.WorldMatrix;
-
-                GraphicsDevice.SetVertexBuffer(chunk.SolidVertexBuffer);
-
-                foreach (EffectPass pass in effect.CurrentTechnique.Passes) 
+                chunk = chunkManager.ChunksToDraw[i];
+                for (int j = 0; j < chunk.Meshes.Count; j++)
                 {
-                    pass.Apply();
-                    GraphicsDevice.DrawPrimitives(PrimitiveType.TriangleList, 0, chunk.SolidVertexBuffer.VertexCount / 3);
+                    mesh = chunk.Meshes[j];
+                    effect.World = Matrix.CreateTranslation(Vector3.Add(chunk.LocalPosition,mesh.Offset));
 
-                    VerticesDrawn += chunk.SolidVertexBuffer.VertexCount;
-                    SidesDrawn += chunk.SidesRenderable;
-                    CubesDrawn += chunk.SolidBlocks;
+                    GraphicsDevice.SetVertexBuffer(mesh.SolidVertexBuffer);
+
+                    foreach (EffectPass pass in effect.CurrentTechnique.Passes)
+                    {
+                        pass.Apply();
+                        GraphicsDevice.DrawPrimitives(PrimitiveType.TriangleList, 0, mesh.SolidVertexBuffer.VertexCount / 3);
+
+                        VerticesDrawn += mesh.SolidVertexBuffer.VertexCount;
+                        SidesDrawn += mesh.SidesRenderable;
+                        CubesDrawn += mesh.SolidBlocks;
+                    }
                 }
             }
 
             debug.DebugDisplay.AddLine(1,"Vertices Drawn: " + VerticesDrawn.ToString());
             debug.DebugDisplay.AddLine(2,"Sides Drawn: " + SidesDrawn.ToString());
             debug.DebugDisplay.AddLine(3,"Cubes Drawn: " + CubesDrawn.ToString());
+            debug.DebugDisplay.AddLine(4, "Chunks Drawn: " + chunkManager.ChunksToDraw.Count.ToString());
             
             // TODO: Add your drawing code here
 

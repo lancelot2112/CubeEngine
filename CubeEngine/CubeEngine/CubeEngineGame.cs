@@ -60,7 +60,6 @@ namespace CubeEngine
             effect.VertexColorEnabled = true;
             chunkManager = new ChunkManager(GraphicsDevice, new ChunkCoords(0,0,20));
             currentRaster = RasterizerState.CullCounterClockwise;
-;
 
             // TODO: use this.Content to load your game content here
         }
@@ -92,6 +91,7 @@ namespace CubeEngine
                 currentRaster.CullMode = previous.FillMode == FillMode.Solid ? CullMode.None : CullMode.CullCounterClockwiseFace;
                 currentRaster.FillMode = previous.FillMode == FillMode.Solid ? FillMode.WireFrame : FillMode.Solid;  
             }
+
             // TODO: Add your update logic here
 
             base.Update(gameTime);
@@ -110,33 +110,44 @@ namespace CubeEngine
 
             effect.Projection = camera.Projection;
             effect.View = camera.View;
+
             int VerticesDrawn = 0;
             int SidesDrawn = 0;
-            int CubesDrawn = 0;
+            int CubesDrawn = 0;            
 
             Chunk chunk;
             ChunkSubMesh mesh;
+            BoundingBox bound;
+
             for (int i = 0; i < chunkManager.ChunksToDraw.Count; i++)
             {
-                chunk = chunkManager.ChunksToDraw[i];
+            chunk = chunkManager.ChunksToDraw[i];
                 for (int j = 0; j < chunk.Meshes.Count; j++)
                 {
                     mesh = chunk.Meshes[j];
-                    effect.World = Matrix.CreateTranslation(Vector3.Add(chunk.LocalPosition,mesh.Offset));
-
-                    GraphicsDevice.SetVertexBuffer(mesh.SolidVertexBuffer);
-
-                    foreach (EffectPass pass in effect.CurrentTechnique.Passes)
+                    mesh.GetBoundingBox(out bound);
+                    if (camera.ViewFrustum.Contains(bound) != ContainmentType.Disjoint)
                     {
-                        pass.Apply();
-                        GraphicsDevice.DrawPrimitives(PrimitiveType.TriangleList, 0, mesh.SolidVertexBuffer.VertexCount / 3);
+                        effect.World = Matrix.CreateTranslation(mesh.Position);
 
-                        VerticesDrawn += mesh.SolidVertexBuffer.VertexCount;
-                        SidesDrawn += mesh.SidesRenderable;
-                        CubesDrawn += mesh.SolidBlocks;
+                        mesh.GetBoundingBox(out bound);
+
+                        GraphicsDevice.SetVertexBuffer(mesh.VertexBuffer);
+
+                        foreach (EffectPass pass in effect.CurrentTechnique.Passes)
+                        {
+                            pass.Apply();
+                            GraphicsDevice.DrawPrimitives(PrimitiveType.TriangleList, 0, mesh.VertexBuffer.VertexCount / 3);
+
+                            VerticesDrawn += mesh.VertexBuffer.VertexCount;
+                            SidesDrawn += mesh.SidesRenderable;
+                            CubesDrawn += mesh.SolidBlocks;
+                        }
                     }
                 }
             }
+            
+
 
             debug.DebugDisplay.AddLine(1,"Vertices Drawn: " + VerticesDrawn.ToString());
             debug.DebugDisplay.AddLine(2,"Sides Drawn: " + SidesDrawn.ToString());

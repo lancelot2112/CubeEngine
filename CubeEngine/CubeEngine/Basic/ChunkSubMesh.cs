@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using CubeEngine.Rendering;
 
 namespace CubeEngine.Basic
 {
@@ -16,6 +17,7 @@ namespace CubeEngine.Basic
         private int m_yStartIndex;
         private int m_yEndIndex;
         public Vector3 Offset;
+        public Vector3 Position;
 
         //Statisitics
         public int SolidBlocks;
@@ -24,36 +26,50 @@ namespace CubeEngine.Basic
         //Render Members
         public bool AllowRender;
         public bool Empty;
-        private List<VertexPositionColor> solidVertexList;
-        private List<VertexPositionColor> transparentVertexList;
-        public VertexBuffer SolidVertexBuffer;
-        public VertexBuffer TransparentVertexBuffer;
+        public VertexBuffer VertexBuffer;        
 
         public ChunkSubMesh(int yStartIndex)
         {
             m_yStartIndex = yStartIndex;
             m_yEndIndex = yStartIndex + SIZE_Z;
-            solidVertexList = new List<VertexPositionColor>();
-            transparentVertexList = new List<VertexPositionColor>();
 
             Offset = Vector3.Up * yStartIndex;
         }
 
-        public void BuildVertices(GraphicsDevice graphics, Cube[,,] parentCubes, Chunk posX, Chunk negX, Chunk posZ, Chunk negZ)
+        public void GetBoundingBox(out BoundingBox boundingBox)
+        {
+            boundingBox.Max = Position + new Vector3(SIZE_X, SIZE_Y, SIZE_Z);
+            boundingBox.Min = Position;            
+        }
+
+        public void Update(Vector3 chunkPosition)
+        {
+            Vector3.Add(ref chunkPosition, ref Offset, out Position);
+        }
+        public void BuildVertices(List<VertexPositionColor> vertexList, GraphicsDevice graphics, Cube[,,] parentCubes, Chunk posX, Chunk negX, Chunk posZ, Chunk negZ)
         {
             Cube neighbor;
-            Cube current;
-            List<VertexPositionColor> vertexList;
+            Cube current;            
             Vector3 offset;
+            Vector3 pos1;
+            Vector3 pos2;
+            Vector3 pos3;
+            Vector3 pos4;
+            Vector3 pos5;
+            Vector3 pos6;
+            Vector3 pos7;
+            Vector3 pos8;
+
+            CubeVertex vertex;
+
+            Color color;
 
             for (byte x = 0; x < SIZE_X; x++)
                 for (byte y = 0; y < SIZE_Y; y++)
                     for (byte z = 0; z < SIZE_Z; z++)
                     {
                         current = parentCubes[x, y, z];
-                        if (!current.IsRenderable()) continue;
-                        else if (current.IsTransparent()) vertexList = transparentVertexList;
-                        else vertexList = solidVertexList;
+                        if (!current.IsRenderable()) continue;                        
 
                         SolidBlocks += 1;
 
@@ -61,18 +77,29 @@ namespace CubeEngine.Basic
                         offset.Y = y;
                         offset.Z = z;
 
+                        pos1 = CubeVertex.CORNER_NNN + offset;
+                        pos2 = CubeVertex.CORNER_NNP + offset;
+                        pos3 = CubeVertex.CORNER_NPN + offset;
+                        pos4 = CubeVertex.CORNER_NPP + offset;
+                        pos5 = CubeVertex.CORNER_PNN + offset;
+                        pos6 = CubeVertex.CORNER_PNP + offset;
+                        pos7 = CubeVertex.CORNER_PPN + offset;
+                        pos8 = CubeVertex.CORNER_PPP + offset;
+
+                        color = new Color(current.Red, current.Green, current.Blue); 
+
                         //-x
                         if (x == 0) neighbor = (negX != null) ? negX.GetCube(SIZE_X - 1, y, z) : Cube.AIR;
                         else neighbor = parentCubes[x - 1, y, z];
 
                         if (neighbor.IsTransparent())
                         {
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NPN + offset, Color.Green));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NPP + offset, Color.Green));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NNN + offset, Color.Green));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NNN + offset, Color.Green));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NPP + offset, Color.Green));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NNP + offset, Color.Green));
+                            vertexList.Add(new VertexPositionColor(pos3, color));
+                            vertexList.Add(new VertexPositionColor(pos4, color));
+                            vertexList.Add(new VertexPositionColor(pos1, color));
+                            vertexList.Add(new VertexPositionColor(pos1, color));
+                            vertexList.Add(new VertexPositionColor(pos4, color));
+                            vertexList.Add(new VertexPositionColor(pos2, color));                            
 
                             SidesRenderable += 1;
                         }
@@ -83,12 +110,12 @@ namespace CubeEngine.Basic
 
                         if (neighbor.IsTransparent())
                         {
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PPP + offset, Color.Blue));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PPN + offset, Color.Blue));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PNP + offset, Color.Blue));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PNP + offset, Color.Blue));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PPN + offset, Color.Blue));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PNN + offset, Color.Blue));
+                            vertexList.Add(new VertexPositionColor(pos8, color));
+                            vertexList.Add(new VertexPositionColor(pos7, color));
+                            vertexList.Add(new VertexPositionColor(pos6, color));
+                            vertexList.Add(new VertexPositionColor(pos6, color));
+                            vertexList.Add(new VertexPositionColor(pos7, color));
+                            vertexList.Add(new VertexPositionColor(pos5, color));
 
                             SidesRenderable += 1;
                         }
@@ -99,12 +126,12 @@ namespace CubeEngine.Basic
 
                         if (neighbor.IsTransparent())
                         {
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NNP + offset, Color.Orange));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PNP + offset, Color.Orange));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NNN + offset, Color.Orange));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NNN + offset, Color.Orange));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PNP + offset, Color.Orange));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PNN + offset, Color.Orange));
+                            vertexList.Add(new VertexPositionColor(pos2, color));
+                            vertexList.Add(new VertexPositionColor(pos6, color));
+                            vertexList.Add(new VertexPositionColor(pos1, color));
+                            vertexList.Add(new VertexPositionColor(pos1, color));
+                            vertexList.Add(new VertexPositionColor(pos6, color));
+                            vertexList.Add(new VertexPositionColor(pos5, color));
 
                             SidesRenderable += 1;
                         }
@@ -115,12 +142,12 @@ namespace CubeEngine.Basic
 
                         if (neighbor.IsTransparent())
                         {
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NPN + offset, Color.Yellow));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PPN + offset, Color.Yellow));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NPP + offset, Color.Yellow));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NPP + offset, Color.Yellow));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PPN + offset, Color.Yellow));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PPP + offset, Color.Yellow));
+                            vertexList.Add(new VertexPositionColor(pos3, color));
+                            vertexList.Add(new VertexPositionColor(pos7, color));
+                            vertexList.Add(new VertexPositionColor(pos4, color));
+                            vertexList.Add(new VertexPositionColor(pos4, color));
+                            vertexList.Add(new VertexPositionColor(pos7, color));
+                            vertexList.Add(new VertexPositionColor(pos8, color));
 
                             SidesRenderable += 1;
                         }
@@ -131,12 +158,12 @@ namespace CubeEngine.Basic
 
                         if (neighbor.IsTransparent())
                         {
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PPN + offset, Color.Violet));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NPN + offset, Color.Violet));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PNN + offset, Color.Violet));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PNN + offset, Color.Violet));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NPN + offset, Color.Violet));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NNN + offset, Color.Violet));
+                            vertexList.Add(new VertexPositionColor(pos7, color));
+                            vertexList.Add(new VertexPositionColor(pos3, color));
+                            vertexList.Add(new VertexPositionColor(pos5, color));
+                            vertexList.Add(new VertexPositionColor(pos5, color));
+                            vertexList.Add(new VertexPositionColor(pos3, color));
+                            vertexList.Add(new VertexPositionColor(pos1, color));
 
                             SidesRenderable += 1;
                         }
@@ -147,37 +174,37 @@ namespace CubeEngine.Basic
 
                         if (neighbor.IsTransparent())
                         {
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NPP + offset, Color.Red));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PPP + offset, Color.Red));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NNP + offset, Color.Red));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_NNP + offset, Color.Red));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PPP + offset, Color.Red));
-                            vertexList.Add(new VertexPositionColor(Cube.CORNER_PNP + offset, Color.Red));
+                            vertexList.Add(new VertexPositionColor(pos4, color));
+                            vertexList.Add(new VertexPositionColor(pos8, color));
+                            vertexList.Add(new VertexPositionColor(pos2, color));
+                            vertexList.Add(new VertexPositionColor(pos2, color));
+                            vertexList.Add(new VertexPositionColor(pos8, color));
+                            vertexList.Add(new VertexPositionColor(pos6, color));
 
                             SidesRenderable += 1;
                         }
                     }
 
-            if (solidVertexList.Count > 0)
+            if (vertexList.Count > 0)
             {
-                SolidVertexBuffer = new VertexBuffer(graphics, typeof(VertexPositionColor), solidVertexList.Count, BufferUsage.None);
-                SolidVertexBuffer.SetData<VertexPositionColor>(solidVertexList.ToArray());
-                solidVertexList.Clear();
+                VertexBuffer = new VertexBuffer(graphics, typeof(VertexPositionColor), vertexList.Count, BufferUsage.None);
+                VertexBuffer.SetData<VertexPositionColor>(vertexList.ToArray());
+                vertexList.Clear();
                 Empty = false;
             }
 
-            if (transparentVertexList.Count > 0)
-            {
-                TransparentVertexBuffer = new VertexBuffer(graphics, typeof(VertexPositionColor), transparentVertexList.Count, BufferUsage.None);
-                TransparentVertexBuffer.SetData<VertexPositionColor>(transparentVertexList.ToArray());
-                transparentVertexList.Clear();
-            }
+            //if (transparentVertexList.Count > 0)
+            //{
+            //    TransparentVertexBuffer = new VertexBuffer(graphics, typeof(VertexPositionColor), transparentVertexList.Count, BufferUsage.None);
+            //    TransparentVertexBuffer.SetData<VertexPositionColor>(transparentVertexList.ToArray());
+            //    transparentVertexList.Clear();
+            //}
         }
 
         public void Dispose()
         {
-            if(SolidVertexBuffer != null) SolidVertexBuffer.Dispose();
-            if(TransparentVertexBuffer != null) TransparentVertexBuffer.Dispose();
+            if(VertexBuffer != null) VertexBuffer.Dispose();
+            //if(TransparentVertexBuffer != null) TransparentVertexBuffer.Dispose();
         }
     }
 }

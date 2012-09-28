@@ -15,7 +15,7 @@ namespace CubeEngine.Basic
     {
         public const int WIDTH = 16;
         public const int HEIGHT = 128;
-        public const int DEPENDENCIES_MET_FLAG = 15;
+        public const int DEPENDENCIES_MET_FLAG_VALUE = 15;
 
         /// <summary>
         ///  1: +x
@@ -33,7 +33,7 @@ namespace CubeEngine.Basic
 
         public List<ChunkSubMesh> Meshes;
         public bool ChangedSinceLoad;
-        public bool Built;
+        public volatile bool CompletedInitialBuild;
         public bool Empty;
 
         private Cube[, ,] m_cubes;
@@ -41,21 +41,28 @@ namespace CubeEngine.Basic
 
         public Chunk(ChunkManager manager, ChunkCoords coords)
         {
-            manager.ChunkLoadedEvent += CheckDependence;
+            manager.ChunkLoadedEvent += ChunkLoadedCallback;
             Coords = coords;
             LocalPosition = new Vector3(coords.X * WIDTH, 0f, coords.Z * WIDTH);
             m_cubes = new Cube[WIDTH, HEIGHT, WIDTH];
             Meshes = new List<ChunkSubMesh>();
 
             ChangedSinceLoad = false;
-            Built = false;
+            CompletedInitialBuild = false;
             Empty = true;
-            PositionUpdated = false;
         }
 
         public void Update(float dt, Vector3 deltaPosition)
         {
-            LocalPosition -= deltaPosition;
+            if (CompletedInitialBuild)
+            {
+                LocalPosition -= deltaPosition;
+
+                for (int i = 0; i < Meshes.Count; i++)
+                {
+                    Meshes[i].Update(LocalPosition);
+                }
+            }
         }
 
         public void SetCube(int x, int y, int z, ref Cube cube)
@@ -83,12 +90,11 @@ namespace CubeEngine.Basic
             else return Cube.AIR;
         }
 
-        public void CheckDependence(ChunkManager manager, Chunk chunk)
+        public void ChunkLoadedCallback(ChunkManager manager, Chunk chunk)
         {
-            if (!Built)
+            if (!CompletedInitialBuild)
             {
                 DependenciesFlag |= Coords.Neighbors(chunk.Coords);
-                if (DependenciesFlag == 15 && !manager.ChunksToDraw.Contains(this) && !Built) manager.ChunksToBuild.Enqueue(this);
             }
         }
 
@@ -105,25 +111,27 @@ namespace CubeEngine.Basic
             return true;
         }
 
-        public void BuildVertices(GraphicsDevice graphics, Chunk posX, Chunk negX, Chunk posZ, Chunk negZ)
-        {
+        public void BuildVertices(List<VertexPositionColor> buffer, GraphicsDevice graphics, Chunk posX, Chunk negX, Chunk posZ, Chunk negZ)
+        {         
+
             ChunkSubMesh currentMesh;
             int i = 0;
             while(i < HEIGHT)
             {
-                if (posX.PositionUpdated) LocalPosition = posX.LocalPosition - Vector3.Right * WIDTH;
-                else if (posZ.PositionUpdated) LocalPosition = posZ.LocalPosition - Vector3.Forward * WIDTH;
-                else if (negX.PositionUpdated) LocalPosition = negX.LocalPosition + Vector3.Right * WIDTH;
-                else if (negZ.PositionUpdated) LocalPosition = negZ.LocalPosition + Vector3.Forward * WIDTH;
-                PositionUpdated = true;
-
                 currentMesh = new ChunkSubMesh(i);
-                currentMesh.BuildVertices(graphics, m_cubes, posX, negX, posZ, negZ);
+                currentMesh.BuildVertices(buffer, graphics, m_cubes, posX, negX, posZ, negZ);
                 if (!currentMesh.Empty) Meshes.Add(currentMesh);
                 i += ChunkSubMesh.SIZE_Z;
             }
 
-            Built = true;
+            if (!CompletedInitialBuild)
+            {
+                if (posX.CompletedInitialBuild) LocalPosition = posX.LocalPosition - Vector3.Right * WIDTH;
+                else if (posZ.CompletedInitialBuild) LocalPosition = posZ.LocalPosition - Vector3.Forward * WIDTH;
+                else if (negX.CompletedInitialBuild) LocalPosition = negX.LocalPosition + Vector3.Right * WIDTH;
+                else if (negZ.CompletedInitialBuild) LocalPosition = negZ.LocalPosition + Vector3.Forward * WIDTH;
+                CompletedInitialBuild = true;
+            }
         }
         public bool LoadFromDisk()
         {

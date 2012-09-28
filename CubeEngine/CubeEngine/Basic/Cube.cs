@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics.PackedVector;
 
 namespace CubeEngine.Basic
 {
@@ -77,14 +78,5 @@ namespace CubeEngine.Basic
             new Cube(CubeType.Grass,0,100,0,3),
             new Cube(CubeType.Stone,112,138,144,3)
         };
-        public static Vector3 CORNER_PPP = new Vector3(1f, 1f, 1f);
-        public static Vector3 CORNER_PPN = new Vector3(1f, 1f, 0f);
-        public static Vector3 CORNER_PNP = new Vector3(1f, 0f, 1f);
-        public static Vector3 CORNER_PNN = new Vector3(1f, 0f, 0f);
-        public static Vector3 CORNER_NPP = new Vector3(0f, 1f, 1f);
-        public static Vector3 CORNER_NPN = new Vector3(0f, 1f, 0f);
-        public static Vector3 CORNER_NNP = new Vector3(0f, 0f, 1f);
-        public static Vector3 CORNER_NNN = new Vector3(0f, 0f, 0f);
-
     }
 }

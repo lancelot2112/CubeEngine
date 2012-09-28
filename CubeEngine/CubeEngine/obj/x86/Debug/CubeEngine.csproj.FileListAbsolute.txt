@@ -16,3 +16,4 @@ C:\Users\Lancer\Dropbox\Projects\CubeEngine\CubeEngine\CubeEngine\bin\x86\Debug\
 C:\Users\Lancer\Dropbox\Projects\CubeEngine\CubeEngine\CubeEngine\bin\x86\Debug\CubeEngine.pdb
 C:\Users\Lancer\Dropbox\Projects\CubeEngine\CubeEngine\CubeEngine\bin\x86\Debug\XerUtilities.dll
 C:\Users\Lancer\Dropbox\Projects\CubeEngine\CubeEngine\CubeEngine\bin\x86\Debug\XerUtilities.pdb
+C:\Users\Lancer\Dropbox\Projects\CubeEngine\CubeEngine\CubeEngine\bin\x86\Debug\Content\Effects\CubeEffect.xnb

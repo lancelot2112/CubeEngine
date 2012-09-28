@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework;
+using CubeEngine.Rendering;
 
 namespace CubeEngine.Basic
 {
@@ -26,11 +27,11 @@ namespace CubeEngine.Basic
         /// </summary>
 
         public static int chunkRadius = 5;
-        public const int PER_FRAME_CHUNKS_LOAD = 1;
-        public const int PER_FRAME_CHUNKS_BUILD = 1;
-        public const float TIME_BETWEEN_LOADS = 1f;
-        public const float TIME_BETWEEN_BUILDS = 1f;
-        public const int CHUNK_BUILD_DIST = 5;
+        public const int PER_FRAME_CHUNKS_LOAD = 5;
+        public const int PER_FRAME_CHUNKS_BUILD = 5;
+        public const float TIME_BETWEEN_LOADS = .1f;
+        public const float TIME_BETWEEN_BUILDS = .1f;
+        public const int CHUNK_BUILD_DIST = 0;
 
         //public static int xOffset = (int)(xChunkNumber * 0.5f);
         //public static int yOffset = (int)(yChunkNumber * 0.5f);
@@ -59,7 +60,9 @@ namespace CubeEngine.Basic
 
         private float m_timeSinceBuild;
         private float m_timeSinceLoad;
-        private List<VertexPositionColor> m_vertexBuffer;
+        private List<CubeVertex> m_vertexBuffer;
+
+        public int ActiveChunks { get { return m_chunkStorage.ActiveChunks; } }
 
         public ChunkManager(GraphicsDevice graphics, ChunkCoords playerPosition)
         {
@@ -70,7 +73,7 @@ namespace CubeEngine.Basic
 
             m_chunkStorage = new ChunkStorage(chunkRadius);
             m_loadQueue = new Queue<ChunkCoords>();
-            m_vertexBuffer = new List<VertexPositionColor>();
+            m_vertexBuffer = new List<CubeVertex>();
             
             ChunksToBuild = new Queue<Chunk>();
             ChunksToRebuild = new Queue<Chunk>();
@@ -218,7 +221,7 @@ namespace CubeEngine.Basic
                         for (int y = 0; y < Chunk.HEIGHT; y++)
                             for (int z = 0; z < Chunk.WIDTH; z++)
                             {
-                                if (XerUtilities.Common.MathLib.NextRandom() > 0.5f)
+                                if (y < Chunk.HEIGHT*0.5f + XerUtilities.Common.MathLib.NextRandom()*20f)
                                 {
                                     curr.SetCube(x, y, z, ref dirt);
                                 }
@@ -242,17 +245,17 @@ namespace CubeEngine.Basic
             Chunk curr;
             Chunk posX = null;
             Chunk negX = null;
-            Chunk posY = null;
-            Chunk negY = null;
+            Chunk posZ = null;
+            Chunk negZ = null;
             while (ChunksToBuild.Count > 0 && PER_FRAME_CHUNKS_BUILD - chunksBuiltThisFrame >= 0)
             {
                 curr = ChunksToBuild.Dequeue();
                 negX = m_chunkStorage.GetChunk(curr.Coords.X - 1, curr.Coords.Z);
                 posX = m_chunkStorage.GetChunk(curr.Coords.X + 1, curr.Coords.Z);
-                negY = m_chunkStorage.GetChunk(curr.Coords.X, curr.Coords.Z - 1);
-                posY = m_chunkStorage.GetChunk(curr.Coords.X, curr.Coords.Z + 1);
+                negZ = m_chunkStorage.GetChunk(curr.Coords.X, curr.Coords.Z - 1);
+                posZ = m_chunkStorage.GetChunk(curr.Coords.X, curr.Coords.Z + 1);
 
-                curr.BuildVertices(m_vertexBuffer, m_graphics, posX, negX, posY, negY);
+                curr.BuildVertices(m_vertexBuffer, m_graphics, posX, negX, posZ, negZ);
 
                 if(curr.Meshes.Count > 0 && !ChunksToDraw.Contains(curr)) ChunksToDraw.Add(curr);
 

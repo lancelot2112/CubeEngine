@@ -6,12 +6,13 @@ float4x4 Projection;
 //sampler Texture;
 
 static const int num_of_lights = 10;
+static const float inv_255 = 1.0/255.0;
 float3 fLightColor[num_of_lights];
 float3 fLightPos[num_of_lights];
 
 struct VertexShaderInput
 {
-    float3 position : POSITION0;
+    float4 position : POSITION0;
 	byte4 normal : NORMAL0;
 	half2 uv : TEXCOORD0;
 	byte4 color : COLOR0;
@@ -39,8 +40,8 @@ VertexShaderOutput VertexShaderFunction(VertexShaderInput input)
 	output.worldPos = worldPos;
 
 	output.normal = float4(input.normal.xyzw);
-	output.color = float4(input.color.xyzw);
-	output.light = float4(input.light.xyzw);
+	output.color = float4(input.color.xyz*inv_255,input.color.w);
+	output.light = float4(input.light.xyz*inv_255,input.light.w);
 	output.uv = float2(input.uv.xy);
 
     return output;
@@ -80,6 +81,7 @@ float4 PixelShaderFunction(VertexShaderOutput input) : COLOR0
 	}
 
 	tmpColor.xyz += input.light.xyz;
+	tmpColor.a = 1;
 	return tmpColor;
 }
 

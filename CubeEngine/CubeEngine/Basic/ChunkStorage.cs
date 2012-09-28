@@ -11,6 +11,7 @@ namespace CubeEngine.Basic
         public Chunk[,] Chunks;
 
         private List<Chunk> m_activeChunks;
+        public int ActiveChunks { get { return m_activeChunks.Count; } }
 
         private int m_dimLength;
         private float m_invDimLength;

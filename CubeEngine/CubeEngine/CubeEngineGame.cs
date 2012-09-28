@@ -27,7 +27,7 @@ namespace CubeEngine
         ChunkManager chunkManager;
         XerInput input;
         DeltaFreeCamera camera;
-        BasicEffect effect;
+        Effect effect;
         RasterizerState currentRaster;
 
         public CubeEngineGame()
@@ -56,10 +56,9 @@ namespace CubeEngine
         /// </summary>
         protected override void LoadContent()
         {
-            effect = new BasicEffect(GraphicsDevice);
-            effect.VertexColorEnabled = true;
+            effect = Content.Load<Effect>("Effects/CubeEffect");
             chunkManager = new ChunkManager(GraphicsDevice, new ChunkCoords(0,0,20));
-            currentRaster = RasterizerState.CullCounterClockwise;
+            currentRaster = RasterizerState.CullNone;
 
             // TODO: use this.Content to load your game content here
         }
@@ -88,7 +87,7 @@ namespace CubeEngine
             {
                 RasterizerState previous = currentRaster;
                 currentRaster = new RasterizerState();
-                currentRaster.CullMode = previous.FillMode == FillMode.Solid ? CullMode.None : CullMode.CullCounterClockwiseFace;
+                currentRaster.CullMode = previous.FillMode == FillMode.Solid ? CullMode.None : CullMode.None;//CullMode.CullCounterClockwiseFace;
                 currentRaster.FillMode = previous.FillMode == FillMode.Solid ? FillMode.WireFrame : FillMode.Solid;  
             }
 
@@ -108,12 +107,14 @@ namespace CubeEngine
 
             GraphicsDevice.Clear(Color.CornflowerBlue);
 
-            effect.Projection = camera.Projection;
-            effect.View = camera.View;
+            effect.Parameters["Projection"].SetValue(camera.Projection);
+            effect.Parameters["View"].SetValue(camera.View);
 
             int VerticesDrawn = 0;
             int SidesDrawn = 0;
-            int CubesDrawn = 0;            
+            int CubesDrawn = 0;
+            int SubMeshesDrawn = 0;
+            int TotalSubMeshes = 0;
 
             Chunk chunk;
             ChunkSubMesh mesh;
@@ -126,11 +127,12 @@ namespace CubeEngine
                 {
                     mesh = chunk.Meshes[j];
                     mesh.GetBoundingBox(out bound);
+                    TotalSubMeshes += 1;
                     if (camera.ViewFrustum.Contains(bound) != ContainmentType.Disjoint)
                     {
-                        effect.World = Matrix.CreateTranslation(mesh.Position);
+                        effect.Parameters["World"].SetValue(Matrix.CreateTranslation(mesh.Position));
 
-                        mesh.GetBoundingBox(out bound);
+                        SubMeshesDrawn++;
 
                         GraphicsDevice.SetVertexBuffer(mesh.VertexBuffer);
 
@@ -149,10 +151,11 @@ namespace CubeEngine
             
 
 
-            debug.DebugDisplay.AddLine(1,"Vertices Drawn: " + VerticesDrawn.ToString());
-            debug.DebugDisplay.AddLine(2,"Sides Drawn: " + SidesDrawn.ToString());
-            debug.DebugDisplay.AddLine(3,"Cubes Drawn: " + CubesDrawn.ToString());
-            debug.DebugDisplay.AddLine(4, "Chunks Drawn: " + chunkManager.ChunksToDraw.Count.ToString());
+            debug.DebugDisplay.AddLine(1,"v: " + VerticesDrawn.ToString());
+            debug.DebugDisplay.AddLine(2,"s: " + SidesDrawn.ToString());
+            debug.DebugDisplay.AddLine(3,"c: " + CubesDrawn.ToString());
+            debug.DebugDisplay.AddLine(4,"sm: " + SubMeshesDrawn.ToString() + "/" + TotalSubMeshes.ToString());
+            debug.DebugDisplay.AddLine(5, "ch: " + chunkManager.ChunksToDraw.Count.ToString() + "/" + chunkManager.ActiveChunks.ToString());
             
             // TODO: Add your drawing code here
 

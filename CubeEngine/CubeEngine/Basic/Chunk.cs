@@ -5,6 +5,7 @@ using System.Text;
 
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using CubeEngine.Rendering;
 
 namespace CubeEngine.Basic
 {
@@ -13,7 +14,7 @@ namespace CubeEngine.Basic
     /// </summary>
     public class Chunk
     {
-        public const int WIDTH = 16;
+        public const int WIDTH = 32;
         public const int HEIGHT = 128;
         public const int DEPENDENCIES_MET_FLAG_VALUE = 15;
 
@@ -79,7 +80,7 @@ namespace CubeEngine.Basic
             }
             else
             {
-                cube = Cube.AIR;
+                cube = Cube.NULL;
                 return false;
             }
         }
@@ -87,7 +88,7 @@ namespace CubeEngine.Basic
         public Cube GetCube(int x, int y, int z)
         {
             if (InChunk(x, y, z)) return m_cubes[x, y, z];
-            else return Cube.AIR;
+            else return Cube.NULL;
         }
 
         public void ChunkLoadedCallback(ChunkManager manager, Chunk chunk)
@@ -111,8 +112,28 @@ namespace CubeEngine.Basic
             return true;
         }
 
-        public void BuildVertices(List<VertexPositionColor> buffer, GraphicsDevice graphics, Chunk posX, Chunk negX, Chunk posZ, Chunk negZ)
-        {         
+        public void PropogateSun()
+        {
+            for (int x = 0; x < WIDTH; x++)
+            {
+                for (int z = 0; z < WIDTH; z++)
+                {
+                    for (int y = HEIGHT - 1; y >= 0; y--)
+                    {
+                        if (m_cubes[x, y, z].IsTransparent())
+                        {
+                            m_cubes[x, y, z].SunLight = 15;
+                            m_cubes[x, y, z].LocalBlue = 255;
+                        }
+                        else break;
+                    }
+                }
+            }
+        }
+        public void BuildVertices(List<CubeVertex> buffer, GraphicsDevice graphics, Chunk posX, Chunk negX, Chunk posZ, Chunk negZ)
+        {
+
+            PropogateSun();
 
             ChunkSubMesh currentMesh;
             int i = 0;

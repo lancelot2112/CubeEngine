@@ -86,5 +86,15 @@ namespace CubeEngine.Basic
         {
             return !((coords1.X == coords2.X) && (coords1.Z == coords2.Z));
         }
+
+        public override int GetHashCode()
+        {
+            return base.GetHashCode();
+        }
+
+        public override bool Equals(object obj)
+        {
+            return base.Equals(obj);
+        }
     }
 }

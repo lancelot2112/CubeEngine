@@ -22,6 +22,7 @@ namespace CubeEngine.Basic
 
     public enum CubeType : byte
     {
+        NULL = 0,
         Air,
         Dirt,
         Grass,
@@ -71,10 +72,14 @@ namespace CubeEngine.Basic
             return false;
         }
 
-        public static Cube AIR = new Cube();
+        public int SunLight { get { return LightLevels & 15; } set { LightLevels |= (byte)(value & 15); } }
+        public int LocalLight { get { return (LightLevels & 240) >> 4; } set { LightLevels |= (byte)((value & 15) << 4); } }
+
+        public static Cube NULL = new Cube();
         public static Cube[] CUBE_TYPES = new Cube[] 
-        { new Cube(CubeType.Air,0,0,0,0),
-            new Cube(CubeType.Dirt,139,16,19,3),
+        { new Cube(CubeType.NULL,0,0,0,0),
+            new Cube(CubeType.Air,0,0,0,0),
+            new Cube(CubeType.Dirt,193,154,107,3),
             new Cube(CubeType.Grass,0,100,0,3),
             new Cube(CubeType.Stone,112,138,144,3)
         };

@@ -10,7 +10,7 @@ using Microsoft.Xna.Framework.Graphics.PackedVector;
 
 namespace CubeEngine.Rendering
 {
-    public class CubeVertex : IVertexType
+    public struct CubeVertex : IVertexType
     {
         public Vector3 VertexPosition;
         public NormalizedByte4 Normal;
@@ -24,18 +24,18 @@ namespace CubeEngine.Rendering
             (
             new VertexElement(0,VertexElementFormat.Vector3, VertexElementUsage.Position,0),
             new VertexElement(12,VertexElementFormat.Byte4, VertexElementUsage.Normal,0),
-            new VertexElement(24,VertexElementFormat.HalfVector2, VertexElementUsage.TextureCoordinate,0),
-            new VertexElement(32,VertexElementFormat.Byte4,VertexElementUsage.Color,0),
-            new VertexElement(36,VertexElementFormat.Byte4,VertexElementUsage.Color,1)
+            new VertexElement(16,VertexElementFormat.HalfVector2, VertexElementUsage.TextureCoordinate,0),
+            new VertexElement(20,VertexElementFormat.Byte4,VertexElementUsage.Color,0),
+            new VertexElement(24,VertexElementFormat.Byte4,VertexElementUsage.Color,1)
             );
 
-        public CubeVertex(ref Vector3 position, ref NormalizedByte4 normal, ref HalfVector2 texture, ref Cube cube)
+        public CubeVertex(ref Vector3 position, ref NormalizedByte4 normal, ref HalfVector2 texture, ref Cube cube, ref Cube neighbor)
         {
             this.VertexPosition = position;
             this.Normal = normal;
             this.Texture = texture;
             this.ColorInformation = new Byte4(cube.Red, cube.Green, cube.Blue, cube.AlphaSpecular);
-            this.LightInformation = new Byte4(cube.LocalRed, cube.LocalGreen, cube.LocalBlue, cube.LightLevels);
+            this.LightInformation = new Byte4(neighbor.LocalRed, neighbor.LocalGreen, neighbor.LocalBlue, neighbor.LightLevels);
         }
 
         VertexDeclaration IVertexType.VertexDeclaration { get { return VertexDeclaration; } }

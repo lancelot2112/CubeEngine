@@ -1,0 +1,246 @@
+--Light Dependencies-- >> 24
+26 >> {4,0}{4,0}
+loF: 12|liF: 12|buF: 2
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+60 >> {4,-2}{4,8}
+loF: 0|liF: 0|buF: 2
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+50 >> {-4,1}{6,1}
+loF: 4|liF: 4|buF: 1
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+58 >> {4,2}{4,2}
+loF: 0|liF: 0|buF: 2
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+48 >> {1,4}{1,4}
+loF: 1|liF: 3|buF: 8
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+33 >> {-4,0}{6,0}
+loF: 12|liF: 12|buF: 1
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+65 >> {-3,3}{7,3}
+loF: 0|liF: 1|buF: 9
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+67 >> {-3,-3}{7,7}
+loF: 0|liF: 1|buF: 5
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+69 >> {-2,-4}{8,6}
+loF: 0|liF: 1|buF: 4
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+62 >> {2,-4}{2,6}
+loF: 0|liF: 2|buF: 4
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+42 >> {4,1}{4,1}
+loF: 4|liF: 4|buF: 2
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+64 >> {-4,2}{6,2}
+loF: 0|liF: 0|buF: 1
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+52 >> {-4,-1}{6,9}
+loF: 8|liF: 8|buF: 1
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+40 >> {0,-4}{0,6}
+loF: 3|liF: 3|buF: 4
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+57 >> {-1,4}{9,4}
+loF: 2|liF: 3|buF: 8
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+59 >> {3,3}{3,3}
+loF: 0|liF: 2|buF: 10
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+63 >> {2,4}{2,4}
+loF: 0|liF: 2|buF: 8
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+41 >> {0,4}{0,4}
+loF: 3|liF: 3|buF: 8
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+49 >> {1,-4}{1,6}
+loF: 1|liF: 3|buF: 4
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+44 >> {4,-1}{4,9}
+loF: 8|liF: 8|buF: 2
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+56 >> {-1,-4}{9,6}
+loF: 2|liF: 3|buF: 4
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+61 >> {3,-3}{3,7}
+loF: 0|liF: 2|buF: 6
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+68 >> {-2,4}{8,4}
+loF: 0|liF: 1|buF: 8
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+66 >> {-4,-2}{6,8}
+loF: 0|liF: 0|buF: 1
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+--Build Dependencies-- >> 36
+21 >> {-2,-1}{8,9}
+loF: 15|liF: 15|buF: 15
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+12 >> {0,2}{0,2}
+loF: 15|liF: 15|buF: 15
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+9 >> {-2,0}{8,0}
+loF: 15|liF: 15|buF: 15
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+15 >> {2,1}{2,1}
+loF: 15|liF: 15|buF: 15
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+36 >> {-2,2}{8,2}
+loF: 15|liF: 15|buF: 15
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+20 >> {-2,1}{8,1}
+loF: 15|liF: 15|buF: 15
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+16 >> {2,-1}{2,9}
+loF: 15|liF: 15|buF: 15
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+18 >> {1,-2}{1,8}
+loF: 15|liF: 15|buF: 15
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+17 >> {1,2}{1,2}
+loF: 15|liF: 15|buF: 15
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+13 >> {0,-2}{0,8}
+loF: 15|liF: 15|buF: 15
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+6 >> {2,0}{2,0}
+loF: 15|liF: 15|buF: 15
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+23 >> {-1,-2}{9,8}
+loF: 15|liF: 15|buF: 15
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+22 >> {-1,2}{9,2}
+loF: 15|liF: 15|buF: 15
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+30 >> {2,-2}{2,8}
+loF: 15|liF: 15|buF: 15
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+29 >> {2,2}{2,2}
+loF: 15|liF: 15|buF: 15
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+37 >> {-2,-2}{8,8}
+loF: 15|liF: 15|buF: 15
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+38 >> {-1,-3}{9,7}
+loF: 15|liF: 15|buF: 7
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+47 >> {2,-3}{2,7}
+loF: 15|liF: 15|buF: 6
+load: True|lit: True|initBuild: False|empty: True|changed: False
+
+14 >> {3,0}{3,0}
+loF: 15|liF: 15|buF: 14
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+43 >> {3,2}{3,2}
+loF: 15|liF: 15|buF: 10
+load: True|lit: True|initBuild: False|empty: True|changed: False
+
+19 >> {-3,0}{7,0}
+loF: 15|liF: 15|buF: 13
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+54 >> {-2,3}{8,3}
+loF: 15|liF: 15|buF: 9
+load: True|lit: True|initBuild: False|empty: True|changed: False
+
+55 >> {-2,-3}{8,7}
+loF: 15|liF: 15|buF: 5
+load: True|lit: True|initBuild: False|empty: True|changed: False
+
+27 >> {3,1}{3,1}
+loF: 15|liF: 15|buF: 14
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+31 >> {1,3}{1,3}
+loF: 15|liF: 15|buF: 11
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+51 >> {-3,2}{7,2}
+loF: 15|liF: 15|buF: 9
+load: True|lit: True|initBuild: False|empty: True|changed: False
+
+35 >> {-3,-1}{7,9}
+loF: 15|liF: 15|buF: 13
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+32 >> {1,-3}{1,7}
+loF: 15|liF: 15|buF: 7
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+25 >> {0,-3}{0,7}
+loF: 15|liF: 15|buF: 7
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+24 >> {0,3}{0,3}
+loF: 15|liF: 15|buF: 11
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+34 >> {-3,1}{7,1}
+loF: 15|liF: 15|buF: 13
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+45 >> {3,-2}{3,8}
+loF: 15|liF: 15|buF: 6
+load: True|lit: True|initBuild: False|empty: True|changed: False
+
+28 >> {3,-1}{3,9}
+loF: 15|liF: 15|buF: 14
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+39 >> {-1,3}{9,3}
+loF: 15|liF: 15|buF: 11
+load: True|lit: False|initBuild: False|empty: True|changed: False
+
+46 >> {2,3}{2,3}
+loF: 15|liF: 15|buF: 10
+load: True|lit: True|initBuild: False|empty: True|changed: False
+
+53 >> {-3,-2}{7,8}
+loF: 15|liF: 15|buF: 5
+load: True|lit: True|initBuild: False|empty: True|changed: False
+
+--Everything Else-- >> 
+light: 0|build: 0|rebuild: 0
+draw: 9|unload: 0
+

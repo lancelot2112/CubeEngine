@@ -6,7 +6,8 @@ using System.Text;
 namespace CubeEngine.Basic
 {
     /// <summary>
-    /// Handles coordinate wrapping through use of a wrap distance value and a max height value.  This allows for automatic coordinate transformations and figuring out other neighboring chunks.
+    /// Handles coordinate wrapping through use of a wrap distance value and a max height value.  
+    /// This allows for automatic coordinate transformations and figuring out other neighboring chunks.
     /// </summary>
     public struct ChunkCoords
     {
@@ -35,21 +36,25 @@ namespace CubeEngine.Basic
             else Z = temp;
         }
 
-        public ChunkCoords GetShiftedX(int x)
+        public void GetShiftedX(int x, out ChunkCoords coords)
         {
             int temp = X + x;
             if (Math.Abs(temp) > WrapDistance) temp = -temp;
-            return new ChunkCoords(temp, Z, WrapDistance);
+            coords.X = temp;
+            coords.Z = Z;
+            coords.WrapDistance = WrapDistance;
         }
 
-        public ChunkCoords GetShiftedZ(int z)
+        public void GetShiftedZ(int z, out ChunkCoords coords)
         {
             int temp = Z + z;
             if (Math.Abs(temp) > WrapDistance) temp = -temp;
-            return new ChunkCoords(X, temp, WrapDistance);
+            coords.X = X;
+            coords.Z = temp;
+            coords.WrapDistance = WrapDistance;
         }
 
-        public byte Neighbors(ChunkCoords coord2)
+        public byte Neighbors(ref ChunkCoords coord2)
         {
             int diffX = coord2.X - X;
             int diffZ = coord2.Z - Z;
@@ -61,7 +66,7 @@ namespace CubeEngine.Basic
             else return 0;
         }
 
-        public int CompareDistance(ChunkCoords other, ChunkCoords origin)
+        public int CompareDistance(ref ChunkCoords other, ref ChunkCoords origin)
         {
             int dist = Distance(ref origin);
             int otherdist = other.Distance(ref origin);
@@ -77,14 +82,9 @@ namespace CubeEngine.Basic
             return (int)Math.Sqrt(x * x + z * z);
         }
 
-        public static bool operator == (ChunkCoords coords1, ChunkCoords coords2)
+        public override string ToString()
         {
-            return (coords1.X == coords2.X) && (coords1.Z == coords2.Z);
-        }
-
-        public static bool operator != (ChunkCoords coords1, ChunkCoords coords2)
-        {
-            return !((coords1.X == coords2.X) && (coords1.Z == coords2.Z));
+            return "{" + X.ToString() + "," + Z.ToString() + "}";
         }
 
         public override int GetHashCode()
@@ -92,9 +92,9 @@ namespace CubeEngine.Basic
             return base.GetHashCode();
         }
 
-        public override bool Equals(object obj)
+        public bool Equals(ref ChunkCoords coords)
         {
-            return base.Equals(obj);
+            return (coords.X == X) && (coords.Z == Z) && (coords.WrapDistance == WrapDistance);
         }
     }
 }

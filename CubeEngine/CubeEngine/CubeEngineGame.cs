@@ -77,11 +77,22 @@ namespace CubeEngine
         /// checking for collisions, gathering input, and playing audio.
         /// </summary>
         /// <param name="gameTime">Provides a snapshot of timing values.</param>
+        ChunkCoords prevPosition = new ChunkCoords();
+        float timeTillMove = 0.0f;
+        float TimeToMove = 10.0f;
         protected override void Update(GameTime gameTime)
         {
             float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
             camera.Update(dt);
-            chunkManager.Update(dt, new ChunkCoords(), camera.Translation);
+
+            //timeTillMove += dt;
+            //if (timeTillMove > TimeToMove)
+            //{
+            //    timeTillMove -= TimeToMove;
+            //    prevPosition.X += 1;
+            //}
+
+            chunkManager.Update(dt, prevPosition, camera.Translation);
 
             if(input.Keyboard.F2JustPressed) 
             {
@@ -89,6 +100,11 @@ namespace CubeEngine
                 currentRaster = new RasterizerState();
                 currentRaster.CullMode = previous.FillMode == FillMode.Solid ? CullMode.None : CullMode.None;//CullMode.CullCounterClockwiseFace;
                 currentRaster.FillMode = previous.FillMode == FillMode.Solid ? FillMode.WireFrame : FillMode.Solid;  
+            }
+
+            if (input.Keyboard.F3JustPressed)
+            {
+                chunkManager.PrintStats();
             }
 
             // TODO: Add your update logic here
@@ -109,6 +125,7 @@ namespace CubeEngine
 
             effect.Parameters["Projection"].SetValue(camera.Projection);
             effect.Parameters["View"].SetValue(camera.View);
+            effect.Parameters["SkyLightDir"].SetValue(Vector3.Normalize(new Vector3(0.5f,0.75f,1.0f)));
 
             int VerticesDrawn = 0;
             int SidesDrawn = 0;
@@ -120,13 +137,14 @@ namespace CubeEngine
             ChunkSubMesh mesh;
             BoundingBox bound;
 
-            for (int i = 0; i < chunkManager.ChunksToDraw.Count; i++)
+            for (int i = 0; i < chunkManager.DrawList.Count; i++)
             {
-            chunk = chunkManager.ChunksToDraw[i];
+            chunk = chunkManager.DrawList[i];
                 for (int j = 0; j < chunk.Meshes.Count; j++)
                 {
                     mesh = chunk.Meshes[j];
                     mesh.GetBoundingBox(out bound);
+                    BoundingBoxRenderer.Render(bound,GraphicsDevice,camera.View,camera.Projection, Color.Blue);
                     TotalSubMeshes += 1;
                     if (camera.ViewFrustum.Contains(bound) != ContainmentType.Disjoint)
                     {
@@ -155,7 +173,8 @@ namespace CubeEngine
             debug.DebugDisplay.AddLine(2,"s: " + SidesDrawn.ToString());
             debug.DebugDisplay.AddLine(3,"c: " + CubesDrawn.ToString());
             debug.DebugDisplay.AddLine(4,"sm: " + SubMeshesDrawn.ToString() + "/" + TotalSubMeshes.ToString());
-            debug.DebugDisplay.AddLine(5, "ch: " + chunkManager.ChunksToDraw.Count.ToString() + "/" + chunkManager.ActiveChunks.ToString());
+            debug.DebugDisplay.AddLine(5, "ch: " + chunkManager.DrawList.Count.ToString() + "/" + chunkManager.LoadedChunkCount.ToString());
+            debug.DebugDisplay.AddLine(6, "p: " + prevPosition.ToString());
             
             // TODO: Add your drawing code here
 

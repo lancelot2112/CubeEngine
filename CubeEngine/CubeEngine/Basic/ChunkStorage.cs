@@ -10,29 +10,31 @@ namespace CubeEngine.Basic
     {
         public Chunk[,] Chunks;
 
-        private List<Chunk> m_activeChunks;
-        public int ActiveChunks { get { return m_activeChunks.Count; } }
+        public List<Chunk> LoadedChunks;
+        public int LoadedChunkCount { get { return LoadedChunks.Count; } }
 
         private int m_dimLength;
         private float m_invDimLength;
 
         public ChunkStorage(int radius)
         {
-            m_dimLength = 2 * radius + 5;
+            m_dimLength = 2 * radius + 2;
             m_invDimLength = 1 / (float)m_dimLength;
 
             Chunks = new Chunk[m_dimLength, m_dimLength];
-            m_activeChunks = new List<Chunk>();
+            LoadedChunks = new List<Chunk>();
         }
 
-        public void Store(Chunk chunk, Queue<Chunk> unloadQueue)
+        public void Store(Chunk chunk, ChunkManager manager)
         {
             int x = WrapCoord(chunk.Coords.X);
             int z = WrapCoord(chunk.Coords.Z);
 
             if (Chunks[x, z] != null)
             {
-                unloadQueue.Enqueue(Chunks[x, z]);
+                manager.UnloadQueue.Enqueue(Chunks[x, z]);
+                LoadedChunks.Remove(Chunks[x, z]);
+                if (manager.DrawList.Contains(Chunks[x, z])) manager.DrawList.Remove(Chunks[x, z]);
             }
 
             chunk.XIndex = x;
@@ -40,18 +42,22 @@ namespace CubeEngine.Basic
 
             Chunks[x, z] = chunk;
 
-            if (!m_activeChunks.Contains(chunk)) m_activeChunks.Add(chunk);
+            LoadedChunks.Add(chunk);
         }
 
         public void UpdateChunks(float dt, Vector3 deltaPosition)
         {
-            for (int i = 0; i < m_activeChunks.Count; i++)
+            //TODO: Make sure entire list gets updated upon removal from an off thread
+            for (int i = 0; i < LoadedChunks.Count; i++)
             {
-                m_activeChunks[i].Update(dt, deltaPosition);
+                LoadedChunks[i].Update(dt, deltaPosition);
             }
         }
         public Chunk GetChunk(int x, int z)
         {
+            int X = x;
+            int Z = z;
+            
             x = WrapCoord(x);
             z = WrapCoord(z);
 
@@ -63,12 +69,12 @@ namespace CubeEngine.Basic
             int x = WrapCoord(coords.X);
             int z = WrapCoord(coords.Z);
 
-            return (Chunks[x, z] != null) ? Chunks[x, z].Coords == coords : false;
+            return (Chunks[x, z] != null) ? Chunks[x, z].Coords.Equals(ref coords) : false;
         }
 
         public bool Contains(Chunk chunk)
         {
-            return m_activeChunks.Contains(chunk);
+            return LoadedChunks.Contains(chunk);
         }
 
         public int WrapCoord(int val)

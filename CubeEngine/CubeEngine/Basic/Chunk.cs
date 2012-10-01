@@ -14,6 +14,7 @@ namespace CubeEngine.Basic
     /// </summary>
     public class Chunk
     {
+        public static int ObjectCount = 0;
         public const int WIDTH = 32;
         public const int HEIGHT = 128;
         public const int DEPENDENCIES_MET_FLAG_VALUE = 15;
@@ -24,28 +25,39 @@ namespace CubeEngine.Basic
         ///  4: +z
         ///  8: -z
         /// </summary>
-        public byte DependenciesFlag;
+        public byte LoadDependenciesFlag;
+        public byte LightDependenciesFlag;
+        public byte BuildDependenciesFlag;
         public int XIndex;
         public int ZIndex;
+        public int ObjectNumber;
 
         public ChunkCoords Coords;
         public Vector3 LocalPosition;
-        public bool PositionUpdated;
 
-        public List<ChunkSubMesh> Meshes;
-        public bool ChangedSinceLoad;
+        public bool Loaded;
+        public bool Lighted;
         public volatile bool CompletedInitialBuild;
+        public bool ChangedSinceLoad;
         public bool Empty;
 
+        public List<ChunkSubMesh> Meshes;
+
         private Cube[, ,] m_cubes;
+        private int[,] m_heightMap;
         
 
         public Chunk(ChunkManager manager, ChunkCoords coords)
-        {
+        {            
+            ObjectCount += 1;
+            ObjectNumber = ObjectCount;
+            manager.ChunkLoadingEvent += ChunkLoadingCallback;
             manager.ChunkLoadedEvent += ChunkLoadedCallback;
+            manager.ChunkLitEvent += ChunkLitCallback;
             Coords = coords;
             LocalPosition = new Vector3(coords.X * WIDTH, 0f, coords.Z * WIDTH);
             m_cubes = new Cube[WIDTH, HEIGHT, WIDTH];
+            m_heightMap = new int[WIDTH, WIDTH];
             Meshes = new List<ChunkSubMesh>();
 
             ChangedSinceLoad = false;
@@ -87,16 +99,33 @@ namespace CubeEngine.Basic
 
         public Cube GetCube(int x, int y, int z)
         {
-            if (InChunk(x, y, z)) return m_cubes[x, y, z];
-            else return Cube.NULL;
+            return m_cubes[x, y, z];
+        }
+
+        public int GetSunLight(int x, int y, int z)
+        {
+            return m_cubes[x, y, z].SunLight;
+        }
+
+        public void SetSunLight(int x, int y, int z, int sunLight)
+        {
+            m_cubes[x, y, z].SunLight = sunLight;
+            Lighted = false;
+        }
+
+        public void ChunkLoadingCallback(ChunkManager manager, Chunk chunk)
+        {
+            LoadDependenciesFlag |= Coords.Neighbors(ref chunk.Coords);
         }
 
         public void ChunkLoadedCallback(ChunkManager manager, Chunk chunk)
         {
-            if (!CompletedInitialBuild)
-            {
-                DependenciesFlag |= Coords.Neighbors(chunk.Coords);
-            }
+            LightDependenciesFlag |= Coords.Neighbors(ref chunk.Coords);
+        }
+
+        public void ChunkLitCallback(ChunkManager manager, Chunk chunk)
+        {
+            BuildDependenciesFlag |= Coords.Neighbors(ref chunk.Coords);
         }
 
         public bool InChunk(int x, int y, int z)
@@ -112,28 +141,63 @@ namespace CubeEngine.Basic
             return true;
         }
 
-        public void PropogateSun()
+        public void PropagateSun(Chunk posX, Chunk negX, Chunk posZ, Chunk negZ)
         {
+            int maxIndex = HEIGHT-1;
+
+            int sun;
+            int currSun;
+
+            int posXsun;
+            int negXsun;
+            int posZsun;
+            int negZsun;
+
+            int attenuated;
+
+            //SEED sunlight in the top layer
             for (int x = 0; x < WIDTH; x++)
             {
                 for (int z = 0; z < WIDTH; z++)
                 {
-                    for (int y = HEIGHT - 1; y >= 0; y--)
+                    m_cubes[x, maxIndex, z].SunLight = 15 - m_cubes[x, maxIndex, z].Attenuation();
+                }
+            }
+
+            maxIndex = WIDTH-1;
+            for (int y = HEIGHT - 2; y >= 0; y--)
+            {
+                for (int x = 0; x < WIDTH; x++)
+                {
+                    for (int z = 0; z < WIDTH; z++)
                     {
-                        if (m_cubes[x, y, z].IsTransparent())
-                        {
-                            m_cubes[x, y, z].SunLight = 15;
-                            m_cubes[x, y, z].LocalBlue = 255;
-                        }
-                        else break;
+                        if (!m_cubes[x, y, z].IsTransparent()) continue;
+
+                        sun = m_cubes[x, y + 1, z].SunLight;
+                        posXsun = ((x == maxIndex) ? posX.GetSunLight(0, y, z) : m_cubes[x + 1, y, z].SunLight) - 1;
+                        sun = (sun > posXsun) ? sun : posXsun;
+                        negXsun = ((x == 0) ? negX.GetSunLight(maxIndex, y, z) : m_cubes[x - 1, y, z].SunLight) - 1;
+                        sun = (sun > negXsun) ? sun : negXsun;
+                        posZsun = ((z == maxIndex) ? posZ.GetSunLight(x, y, 0) : m_cubes[x, y, z + 1].SunLight) - 1;
+                        sun = (sun > posZsun) ? sun : posZsun;
+                        negZsun = ((z == 0) ? negZ.GetSunLight(x, y, maxIndex) : m_cubes[x, y, z - 1].SunLight) - 1;
+                        sun = (sun > negZsun) ? sun : negZsun;
+                        currSun = m_cubes[x,y,z].SunLight;
+                        m_cubes[x, y, z].SunLight = (currSun > sun) ? currSun : sun;
+
+                        attenuated = sun - 1;
+                        if (posXsun < attenuated && x == maxIndex) posX.SetSunLight(0, y, z, attenuated);
+                        else if (negXsun < attenuated && x == 0) negX.SetSunLight(maxIndex, y, z, attenuated);
+                        if (posZsun < attenuated && z == maxIndex) posZ.SetSunLight(x, y, 0, attenuated);
+                        else if (negZsun < attenuated && z == 0) negZ.SetSunLight(x, y, maxIndex, attenuated);
                     }
                 }
             }
+
+            Lighted = true;
         }
         public void BuildVertices(List<CubeVertex> buffer, GraphicsDevice graphics, Chunk posX, Chunk negX, Chunk posZ, Chunk negZ)
-        {
-
-            PropogateSun();
+        {           
 
             ChunkSubMesh currentMesh;
             int i = 0;
@@ -142,15 +206,15 @@ namespace CubeEngine.Basic
                 currentMesh = new ChunkSubMesh(i);
                 currentMesh.BuildVertices(buffer, graphics, m_cubes, posX, negX, posZ, negZ);
                 if (!currentMesh.Empty) Meshes.Add(currentMesh);
-                i += ChunkSubMesh.SIZE_Z;
+                i += Chunk.WIDTH;
             }
 
             if (!CompletedInitialBuild)
             {
                 if (posX.CompletedInitialBuild) LocalPosition = posX.LocalPosition - Vector3.Right * WIDTH;
-                else if (posZ.CompletedInitialBuild) LocalPosition = posZ.LocalPosition - Vector3.Forward * WIDTH;
+                else if (posZ.CompletedInitialBuild) LocalPosition = posZ.LocalPosition - Vector3.Backward * WIDTH;
                 else if (negX.CompletedInitialBuild) LocalPosition = negX.LocalPosition + Vector3.Right * WIDTH;
-                else if (negZ.CompletedInitialBuild) LocalPosition = negZ.LocalPosition + Vector3.Forward * WIDTH;
+                else if (negZ.CompletedInitialBuild) LocalPosition = negZ.LocalPosition + Vector3.Backward * WIDTH;
                 CompletedInitialBuild = true;
             }
         }
@@ -169,6 +233,15 @@ namespace CubeEngine.Basic
             {
                 Meshes[i].Dispose();
             }
+        }
+
+        public override string ToString()
+        {
+            StringBuilder builder = new StringBuilder();
+            builder.AppendLine(Coords.ToString() + "{" + XIndex + "," + ZIndex + "}");
+            builder.AppendLine("loF: " + LoadDependenciesFlag.ToString() +"|liF: " + LightDependenciesFlag.ToString() + "|buF: " + BuildDependenciesFlag.ToString());
+            builder.AppendLine("load: " + Loaded.ToString() + "|lit: " + Lighted.ToString() + "|initBuild: " + CompletedInitialBuild.ToString() + "|empty: " + Empty.ToString() + "|changed: " + ChangedSinceLoad.ToString());
+            return builder.ToString();
         }
     }
 

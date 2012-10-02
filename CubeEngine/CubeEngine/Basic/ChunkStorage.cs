@@ -31,10 +31,9 @@ namespace CubeEngine.Basic
             int z = WrapCoord(chunk.Coords.Z);
 
             if (Chunks[x, z] != null)
-            {
-                manager.UnloadQueue.Enqueue(Chunks[x, z]);
+            {               
                 LoadedChunks.Remove(Chunks[x, z]);
-                if (manager.DrawList.Contains(Chunks[x, z])) manager.DrawList.Remove(Chunks[x, z]);
+                manager.PrepareChunkForUnload(Chunks[x, z]);
             }
 
             chunk.XIndex = x;
@@ -81,7 +80,7 @@ namespace CubeEngine.Basic
         {
             if (val >= m_dimLength)
             {
-                int scale = (int)(val * m_invDimLength+1);
+                int scale = (int)(val * m_invDimLength);
                 val -= m_dimLength * scale;
             }
             else if (val < 0)

@@ -15,8 +15,8 @@ namespace CubeEngine.Basic
     public class Chunk
     {
         public static int ObjectCount = 0;
-        public const int WIDTH = 32;
-        public const int HEIGHT = 128;
+        public const int WIDTH = 16;
+        public const int HEIGHT = 256;
         public const int DEPENDENCIES_MET_FLAG_VALUE = 15;
 
         /// <summary>
@@ -33,13 +33,13 @@ namespace CubeEngine.Basic
         public int ObjectNumber;
 
         public ChunkCoords Coords;
-        public Vector3 LocalPosition;
+        public Vector3 Position;
 
         public bool Loaded;
-        public bool Lighted;
-        public volatile bool CompletedInitialBuild;
-        public bool ChangedSinceLoad;
+        public bool Lit;        
         public bool Empty;
+        public bool Unloading;
+        public bool ChangedSinceLoad;
 
         public List<ChunkSubMesh> Meshes;
 
@@ -47,34 +47,30 @@ namespace CubeEngine.Basic
         private int[,] m_heightMap;
         
 
-        public Chunk(ChunkManager manager, ChunkCoords coords)
+        public Chunk(ChunkManager manager, ref ChunkCoords coords, ref Vector3 initialPosition)
         {            
             ObjectCount += 1;
             ObjectNumber = ObjectCount;
             manager.ChunkLoadingEvent += ChunkLoadingCallback;
             manager.ChunkLoadedEvent += ChunkLoadedCallback;
             manager.ChunkLitEvent += ChunkLitCallback;
+            Position = initialPosition;
             Coords = coords;
-            LocalPosition = new Vector3(coords.X * WIDTH, 0f, coords.Z * WIDTH);
             m_cubes = new Cube[WIDTH, HEIGHT, WIDTH];
             m_heightMap = new int[WIDTH, WIDTH];
             Meshes = new List<ChunkSubMesh>();
 
             ChangedSinceLoad = false;
-            CompletedInitialBuild = false;
             Empty = true;
         }
 
         public void Update(float dt, Vector3 deltaPosition)
         {
-            if (CompletedInitialBuild)
-            {
-                LocalPosition -= deltaPosition;
+            Position -= deltaPosition;
 
-                for (int i = 0; i < Meshes.Count; i++)
-                {
-                    Meshes[i].Update(LocalPosition);
-                }
+            for (int i = 0; i < Meshes.Count; i++)
+            {
+                Meshes[i].Update(Position);
             }
         }
 
@@ -110,7 +106,7 @@ namespace CubeEngine.Basic
         public void SetSunLight(int x, int y, int z, int sunLight)
         {
             m_cubes[x, y, z].SunLight = sunLight;
-            Lighted = false;
+            Lit = false;
         }
 
         public void ChunkLoadingCallback(ChunkManager manager, Chunk chunk)
@@ -194,30 +190,24 @@ namespace CubeEngine.Basic
                 }
             }
 
-            Lighted = true;
+            Lit = true;
         }
-        public void BuildVertices(List<CubeVertex> buffer, GraphicsDevice graphics, Chunk posX, Chunk negX, Chunk posZ, Chunk negZ)
+        public void BuildVertices(CubeVertex[] buffer, GraphicsDevice graphics, Chunk posX, Chunk negX, Chunk posZ, Chunk negZ)
         {           
 
             ChunkSubMesh currentMesh;
             int i = 0;
             while(i < HEIGHT)
             {
-                currentMesh = new ChunkSubMesh(i);
+                currentMesh = new ChunkSubMesh(i, ref Position);
                 currentMesh.BuildVertices(buffer, graphics, m_cubes, posX, negX, posZ, negZ);
                 if (!currentMesh.Empty) Meshes.Add(currentMesh);
                 i += Chunk.WIDTH;
             }
 
-            if (!CompletedInitialBuild)
-            {
-                if (posX.CompletedInitialBuild) LocalPosition = posX.LocalPosition - Vector3.Right * WIDTH;
-                else if (posZ.CompletedInitialBuild) LocalPosition = posZ.LocalPosition - Vector3.Backward * WIDTH;
-                else if (negX.CompletedInitialBuild) LocalPosition = negX.LocalPosition + Vector3.Right * WIDTH;
-                else if (negZ.CompletedInitialBuild) LocalPosition = negZ.LocalPosition + Vector3.Backward * WIDTH;
-                CompletedInitialBuild = true;
-            }
+
         }
+
         public bool LoadFromDisk()
         {
             return false;
@@ -240,7 +230,7 @@ namespace CubeEngine.Basic
             StringBuilder builder = new StringBuilder();
             builder.AppendLine(Coords.ToString() + "{" + XIndex + "," + ZIndex + "}");
             builder.AppendLine("loF: " + LoadDependenciesFlag.ToString() +"|liF: " + LightDependenciesFlag.ToString() + "|buF: " + BuildDependenciesFlag.ToString());
-            builder.AppendLine("load: " + Loaded.ToString() + "|lit: " + Lighted.ToString() + "|initBuild: " + CompletedInitialBuild.ToString() + "|empty: " + Empty.ToString() + "|changed: " + ChangedSinceLoad.ToString());
+            builder.AppendLine("load: " + Loaded.ToString() + "|lit: " + Lit.ToString() + "|empty: " + Empty.ToString() + "|changed: " + ChangedSinceLoad.ToString());
             return builder.ToString();
         }
     }

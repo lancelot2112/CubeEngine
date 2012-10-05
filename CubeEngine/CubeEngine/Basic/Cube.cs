@@ -22,6 +22,7 @@ namespace CubeEngine.Basic
 
     public enum CubeType : byte
     {
+        NULL = 0,
         Air,
         Dirt,
         Grass,
@@ -38,6 +39,9 @@ namespace CubeEngine.Basic
         public Cube(CubeType type)
         {
             this = CUBE_TYPES[(byte)type];
+            this.Red = (byte)((XerUtilities.Common.MathLib.NextRandom() * 20) + Red);
+            this.Blue = (byte)((XerUtilities.Common.MathLib.NextRandom() * 20) + Blue);
+            this.Green = (byte)((XerUtilities.Common.MathLib.NextRandom() * 20) + Green);
         }
 
         public Cube(CubeType type, byte red, byte green, byte blue, byte alphaSpecular)
@@ -57,26 +61,42 @@ namespace CubeEngine.Basic
             this.Other = other;
         }
 
+        public int Attenuation()
+        {
+            return AlphaSpecular & 15;
+        }
+
         public bool IsTransparent()
         {
-            if ((AlphaSpecular & 3) != 3) return true;
-
-            return false;
+            if ((AlphaSpecular & 15) != 15) return true;
+            else return false;
         }
 
         public bool IsRenderable()
         {
-            if ((AlphaSpecular & 3) != 0) return true;
+            if ((AlphaSpecular & 15) != 0) return true;
 
             return false;
         }
 
-        public static Cube AIR = new Cube();
+        public int SunLight { get { return LightLevels & 15; } set { LightLevels = (byte)((value & 15) | (LightLevels & 240)); } }
+        public int LocalLight { get { return (LightLevels & 240) >> 4; } set { LightLevels = (byte)(((value & 15) << 4) | (LightLevels & 15)); } }
+        public int Alpha { get { return AlphaSpecular & 15; } set { AlphaSpecular = (byte)((value & 15) | (AlphaSpecular & 240)); } }
+        //TODO: Work on fixing set
+        public int Specular { get { return (AlphaSpecular & 240) >> 4; } set { AlphaSpecular = (byte)(((value & 15) << 4) | (AlphaSpecular & 15)); } }
+
+        public override string ToString()
+        {
+            return "t: " + Type.ToString() + " | sl: " + SunLight.ToString() + " | ll: " + LocalLight.ToString();
+        }
+
+        public static Cube NULL = new Cube();
         public static Cube[] CUBE_TYPES = new Cube[] 
-        { new Cube(CubeType.Air,0,0,0,0),
-            new Cube(CubeType.Dirt,139,16,19,3),
-            new Cube(CubeType.Grass,0,100,0,3),
-            new Cube(CubeType.Stone,112,138,144,3)
+        { new Cube(CubeType.NULL,0,0,0,0),
+            new Cube(CubeType.Air,0,0,0,0),
+            new Cube(CubeType.Dirt,193,154,107,15),
+            new Cube(CubeType.Grass,0,100,0,15),
+            new Cube(CubeType.Stone,112,138,144,15)
         };
     }
 }

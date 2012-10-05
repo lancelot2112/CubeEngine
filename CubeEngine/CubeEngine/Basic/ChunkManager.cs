@@ -5,9 +5,13 @@ using System.Text;
 using System.Threading;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework;
+using CubeEngine.Rendering;
 
 namespace CubeEngine.Basic
 {
+    using log = XerUtilities.Debugging.Logger;
+    using System.Diagnostics;
+    using CubeEngine.Utilities.Noise;
     /// <summary>
     /// Chunk Manager general flow
     /// 1. ASYNC Check if any chunks need to be loaded (from disk or into memory)
@@ -24,243 +28,628 @@ namespace CubeEngine.Basic
         /// <summary>
         /// Configurable settings to set how far to load blocks.
         /// </summary>
+        public const int PER_TICK_MAX_QUEUED = 2;
+        public const int PER_TICK_CHUNKS_LOAD = 1;
+        public const int PER_TICK_CHUNKS_LIGHT = 1;
+        public const int PER_TICK_CHUNKS_BUILD = 1;
+        public const float TIME_BETWEEN_QUEUES = .05f;
+        public const float TIME_BETWEEN_LOADS = .5f;
+        public const float TIME_BETWEEN_LIGHTS = .5f;
+        public const float TIME_BETWEEN_BUILDS = .5f;
+        public const int CHUNK_BUILD_DIST = 7;
+        public const int CHUNK_LOAD_DIST = CHUNK_BUILD_DIST + 2;
+        public const int INITIAL_VERTEX_ARRAY_SIZE = 1;
+        public const int MAX_LIGHTING_CACHE = CHUNK_BUILD_DIST * CHUNK_BUILD_DIST * 4;
 
-        public static int chunkRadius = 5;
-        public const int PER_FRAME_CHUNKS_LOAD = 1;
-        public const int PER_FRAME_CHUNKS_BUILD = 1;
-        public const float TIME_BETWEEN_LOADS = 1f;
-        public const float TIME_BETWEEN_BUILDS = 1f;
-        public const int CHUNK_BUILD_DIST = 5;
 
         //public static int xOffset = (int)(xChunkNumber * 0.5f);
         //public static int yOffset = (int)(yChunkNumber * 0.5f);
         //public static int zOffset = (int)(zChunkNumber * 0.5f);
 
-        public delegate void ChunkLoadedHandler(ChunkManager manager, Chunk coords);
-        public event ChunkLoadedHandler ChunkLoadedEvent;
+        public delegate void ChunkHandler(ChunkManager manager, Chunk chunk);
+        public event ChunkHandler ChunkLoadingEvent;
+        public event ChunkHandler ChunkLoadedEvent;
+        public event ChunkHandler ChunkLitEvent;
 
-        public List<Chunk> UnbuiltChunks;
-        private bool m_unbuiltChunksSortNeeded;
+        public List<Chunk> AwaitingLightDependenciesList;
+        private bool _awaitingLightSortNeeded;
+        public List<Chunk> AwaitingBuildDependenciesList;
+        private bool _awaitingBuildSortNeeded;
 
+
+        //Manager Stats
+        public Stopwatch watch1;
+        public Stopwatch watch2;
+        public float TotalUpdateTime;
+        public float QueueTime;
+        public float LoadTime;
+        public float LightTime;
+        public float BuildTime;
+        public float RebuildTime;
+        public float UpdateTime;
+        public float UnloadTime;
+
+        //Thread control
+        public bool UseThreading;
         private volatile bool loadDone;
         private volatile bool buildDone;
         private volatile bool unloadDone;
-        private ManualResetEvent cullDone;
+        private volatile bool lightDone;
+        //private ManualResetEvent cullDone;
 
-        private ChunkStorage m_chunkStorage;
-        private Queue<ChunkCoords> m_loadQueue;        
-        public Queue<Chunk> ChunksToBuild;
-        public Queue<Chunk> ChunksToRebuild;
-        public Queue<Chunk> ChunksToUnload;
-        public List<Chunk> BuiltChunks;
-        public List<Chunk> ChunksToDraw;
+        private ChunkStorage _chunkStorage;
+        private Queue<Chunk> _loadQueue;
+        public Queue<Chunk> LightQueue;
+        public Queue<Chunk> BuildQueue;
+        public Queue<Chunk> RebuildQueue;
+        public Queue<Chunk> UnloadQueue;
+        public List<Chunk> DrawList;
 
         private ChunkCoords m_previousPlayerPosition;
 
-        private float m_timeSinceBuild;
-        private float m_timeSinceLoad;
-        private List<VertexPositionColor> m_vertexBuffer;
+        private float _timeSinceQueue;
+        private float _timeSinceLoad;
+        private float _timeSinceLight;
+        private float _timeSinceBuild;
 
-        public ChunkManager(GraphicsDevice graphics, ChunkCoords playerPosition)
+        //TODO: Switch to array and figure out how to be able to use it without deallocating.
+        private CubeVertex[] _vertexBuffer;
+
+        public int LoadedChunkCount { get { return _chunkStorage.LoadedChunkCount; } }
+
+        public ChunkManager(GraphicsDevice graphics, ChunkCoords chunkPlayerIsIn, Vector3 positionInChunk, bool useThreading)
         {
             m_graphics = graphics;
 
-            UnbuiltChunks = new List<Chunk>();
-            m_unbuiltChunksSortNeeded = false;
+            UseThreading = useThreading;
 
-            m_chunkStorage = new ChunkStorage(chunkRadius);
-            m_loadQueue = new Queue<ChunkCoords>();
-            m_vertexBuffer = new List<VertexPositionColor>();
-            
-            ChunksToBuild = new Queue<Chunk>();
-            ChunksToRebuild = new Queue<Chunk>();
-            ChunksToUnload = new Queue<Chunk>();
-            ChunksToDraw = new List<Chunk>();
+            AwaitingLightDependenciesList = new List<Chunk>();
+            AwaitingBuildDependenciesList = new List<Chunk>();
+            _awaitingLightSortNeeded = false;
+            _awaitingBuildSortNeeded = false;
+
+            _chunkStorage = new ChunkStorage(CHUNK_LOAD_DIST + 1);
+            _loadQueue = new Queue<Chunk>();
+            _vertexBuffer = new CubeVertex[INITIAL_VERTEX_ARRAY_SIZE];
+
+            LightQueue = new Queue<Chunk>();
+            BuildQueue = new Queue<Chunk>();
+            RebuildQueue = new Queue<Chunk>();
+            UnloadQueue = new Queue<Chunk>();
+            DrawList = new List<Chunk>();
+
+            _timeSinceQueue = TIME_BETWEEN_QUEUES;
+            _timeSinceLoad = TIME_BETWEEN_LOADS;
+            _timeSinceLight = TIME_BETWEEN_LIGHTS * 0.5f;
+            _timeSinceBuild = 0.0f;
 
             loadDone = true;
             buildDone = true;
             unloadDone = true;
+            lightDone = true;
 
-            m_loadQueue.Enqueue(playerPosition);
+            //Initialize chunk loading.
+            positionInChunk = -positionInChunk;
+            Chunk seed = new Chunk(this, ref chunkPlayerIsIn, ref positionInChunk);
+            _loadQueue.Enqueue(seed);
+            _chunkStorage.Store(seed, this);
+
+            watch1 = new Stopwatch();
+            watch2 = new Stopwatch();
+
+            Thread thread = new Thread(LoadChunks);
+            thread.IsBackground = true;
+            thread.Priority = ThreadPriority.Lowest;
+            thread.Start();
+
+            thread = new Thread(LightChunks);
+            thread.IsBackground = true;
+            thread.Priority = ThreadPriority.Lowest;
+            thread.Start();
+
+            thread = new Thread(BuildChunkVertices);
+            thread.IsBackground = true;
+            thread.Priority = ThreadPriority.BelowNormal;
+            thread.Start();
         }
 
         public void Update(float dt, ChunkCoords playerPosition, Vector3 deltaPosition)
         {
-            QueueChunks(playerPosition);
+            watch1.Start();
 
-            m_timeSinceLoad += dt;
-            if (m_timeSinceLoad > TIME_BETWEEN_LOADS)
+            //Queue chunks for processing            
+            _timeSinceQueue += dt;
+            if (_timeSinceQueue > TIME_BETWEEN_QUEUES)
             {
-                m_timeSinceLoad -= TIME_BETWEEN_LOADS;
-                if (m_loadQueue.Count > 0 && loadDone)
+                _timeSinceQueue -= TIME_BETWEEN_QUEUES;
+
+                watch2.Start();
+                QueueChunks(playerPosition);
+                watch2.Stop();
+                QueueTime = (float)watch2.Elapsed.TotalMilliseconds;
+            }
+
+            //Load chunks from memory or build chunks use generation algorithms
+            if (!UseThreading)
+            {
+                _timeSinceLoad += dt;
+                if (_timeSinceLoad > TIME_BETWEEN_LOADS)
                 {
-                    loadDone = false;
-                    ThreadPool.QueueUserWorkItem(LoadChunks);
+                    _timeSinceLoad -= TIME_BETWEEN_LOADS;
+
+                    watch2.Reset();
+                    watch2.Start();
+                    LoadChunks(null);
+                    watch2.Stop();
+                    LoadTime = (float)watch2.Elapsed.TotalMilliseconds;
+                }
+
+                //Light chunks using "global" lighting techniques
+                _timeSinceLight += dt;
+                if (_timeSinceLight > TIME_BETWEEN_LIGHTS)
+                {
+                    _timeSinceLight -= TIME_BETWEEN_LIGHTS;
+
+                    watch2.Reset();
+                    watch2.Start();
+                    LightChunks(null);
+                    watch2.Stop();
+                    LightTime = (float)watch2.Elapsed.TotalMilliseconds;
+                }
+
+                //Build chunk vertices from the gathered data
+                _timeSinceBuild += dt;
+                if (_timeSinceBuild > TIME_BETWEEN_BUILDS)
+                {
+                    _timeSinceBuild -= TIME_BETWEEN_BUILDS;
+
+                    watch2.Reset();
+                    watch2.Start();
+                    BuildChunkVertices(null);
+                    watch2.Stop();
+                    BuildTime = (float)watch2.Elapsed.TotalMilliseconds;
                 }
             }
 
-            m_timeSinceBuild += dt;
-            if (m_timeSinceBuild > TIME_BETWEEN_BUILDS)
-            {
-                m_timeSinceBuild -= TIME_BETWEEN_BUILDS;
-                if (ChunksToBuild.Count > 0 && buildDone)
-                {
-                    buildDone = false;
-                    ThreadPool.QueueUserWorkItem(BuildChunkVertices);
-                }
-            }
+
+            //Rebuild chunk vertices, always done sequentially to ensure that changes are immediately noticed by player.
+            watch2.Reset();
+            watch2.Start();
             RebuildChunkVertices();
+            watch2.Stop();
+            RebuildTime = (float)watch2.Elapsed.TotalMilliseconds;
 
-            if (ChunksToUnload.Count > 0 && unloadDone)
+            //Unload chunks by transferring them back to hard drive with changes and then release to object pool (eventually)
+            watch2.Reset();
+            watch2.Start();
+            if (UnloadQueue.Count > 0 && unloadDone && UseThreading)
             {
                 unloadDone = false;
-                ThreadPool.QueueUserWorkItem(UnloadChunks,false);
+                ThreadPool.UnsafeQueueUserWorkItem(UnloadChunks,false);
             }
+            else if (!UseThreading)
+            {
+                UnloadChunks(false);
+            }
+            watch2.Stop();
+            UnloadTime = (float)watch2.Elapsed.TotalMilliseconds;
 
-            m_chunkStorage.UpdateChunks(dt, deltaPosition);
+            //Update all chunks
+            watch2.Reset();
+            watch2.Start();
+            _chunkStorage.UpdateChunks(dt, deltaPosition);
+            watch2.Stop();
+            UpdateTime = (float)watch2.Elapsed.TotalMilliseconds;
 
+            //Store previous player position
             m_previousPlayerPosition = playerPosition;
+
+            watch1.Stop();
+            TotalUpdateTime = (float)watch1.Elapsed.TotalMilliseconds;
+
+            watch1.Reset();
+            watch2.Reset();
         }
 
         public void QueueChunks(ChunkCoords playerPosition)
         {
 
-            if (m_unbuiltChunksSortNeeded) UnbuiltChunks.Sort((x, y) => x.Coords.CompareDistance(y.Coords, playerPosition));
+            if (_awaitingLightSortNeeded) AwaitingLightDependenciesList.Sort((x, y) => x.Coords.CompareDistance(ref y.Coords, ref playerPosition));
+            if (_awaitingBuildSortNeeded) AwaitingBuildDependenciesList.Sort((x, y) => x.Coords.CompareDistance(ref y.Coords, ref playerPosition));
 
             Chunk curr;
+            Chunk other;
             ChunkCoords coords;
-            for (int i = 0; i < UnbuiltChunks.Count; i++)
+            Vector3 newPos;
+            int numAddedToLoadQueue = 0;
+            for (int i = 0; i < AwaitingLightDependenciesList.Count; i++)
             {
-                curr = UnbuiltChunks[i];
+                curr = AwaitingLightDependenciesList[i];
+                if (curr.Unloading)
+                {
+                    AwaitingLightDependenciesList.Remove(curr);
+                    continue;
+                }
+                if (curr.Coords.Distance(ref playerPosition) <= CHUNK_LOAD_DIST)
+                {
+                    if (curr.LoadDependenciesFlag != Chunk.DEPENDENCIES_MET_FLAG_VALUE && numAddedToLoadQueue < PER_TICK_MAX_QUEUED)// && !(AwaitingLightDependenciesList.Count > MAX_LIGHTING_CACHE))
+                    {
+                        //Use the chunk awaiting lighting as a seed for loading the blocks around it if
+                        //they aren't already loaded.
+                        //+x
+                        if (((curr.LoadDependenciesFlag & 1) != 1))
+                        {
+                            curr.Coords.GetShiftedX(1, out coords);
+                            if (!_chunkStorage.Contains(ref coords))
+                            {
+                                newPos = Vector3.Multiply(Vector3.Right, Chunk.WIDTH);
+                                Vector3.Add(ref curr.Position, ref newPos, out newPos);
+                                other = new Chunk(this, ref coords, ref newPos);
+                                _chunkStorage.Store(other, this);
+                                _loadQueue.Enqueue(other);
+                                ChunkLoadingEvent(this, other);
+                                numAddedToLoadQueue++;
+                            }
+                            else
+                            {
+                                curr.LoadDependenciesFlag |= 1;
+                            }
+                        }
+                        //-x
+                        if (((curr.LoadDependenciesFlag & 2) != 2))
+                        {
+                            curr.Coords.GetShiftedX(-1, out coords);
+                            if (!_chunkStorage.Contains(ref coords))
+                            {
+                                newPos = Vector3.Multiply(Vector3.Left, Chunk.WIDTH);
+                                Vector3.Add(ref curr.Position, ref newPos, out newPos);
+                                other = new Chunk(this, ref coords, ref newPos);
+                                _chunkStorage.Store(other, this);
+                                _loadQueue.Enqueue(other);
+                                ChunkLoadingEvent(this, other);
+                                numAddedToLoadQueue++;
+                            }
+                            else
+                            {
+                                curr.LoadDependenciesFlag |= 2;
+                            }
+                        }
+                        //+z
+                        if (((curr.LoadDependenciesFlag & 4) != 4))
+                        {
+                            curr.Coords.GetShiftedZ(1, out coords);
+                            if (!_chunkStorage.Contains(ref coords))
+                            {
+                                newPos = Vector3.Multiply(Vector3.Backward, Chunk.WIDTH);
+                                Vector3.Add(ref curr.Position, ref newPos, out newPos);
+                                other = new Chunk(this, ref coords, ref newPos);
+                                _chunkStorage.Store(other, this);
+                                _loadQueue.Enqueue(other);
+                                ChunkLoadingEvent(this, other);
+                                numAddedToLoadQueue++;
+                            }
+                            else
+                            {
+                                curr.LoadDependenciesFlag |= 4;
+                            }
+                        }
+                        //-z
+                        if (((curr.LoadDependenciesFlag & 8) != 8))
+                        {
+                            curr.Coords.GetShiftedZ(-1, out coords);
+                            if (!_chunkStorage.Contains(ref coords))
+                            {
+                                newPos = Vector3.Multiply(Vector3.Forward, Chunk.WIDTH);
+                                Vector3.Add(ref curr.Position, ref newPos, out newPos);
+                                other = new Chunk(this, ref coords, ref newPos);
+                                _chunkStorage.Store(other, this);
+                                _loadQueue.Enqueue(other);
+                                ChunkLoadingEvent(this, other);
+                                numAddedToLoadQueue++;
+                            }
+                            else
+                            {
+                                curr.LoadDependenciesFlag |= 8;
+                            }
+                        }
+                    }
+                    else if (curr.LightDependenciesFlag == Chunk.DEPENDENCIES_MET_FLAG_VALUE)
+                    {
+                        LightQueue.Enqueue(curr);
+                        AwaitingLightDependenciesList.Remove(curr);
+
+                    }
+                    else if (curr.LoadDependenciesFlag == 15)
+                    {
+                        //+x
+                        if (((curr.LightDependenciesFlag & 1) != 1))
+                        {
+                            curr.Coords.GetShiftedX(1, out coords);
+                            other = _chunkStorage.GetChunk(coords.X, coords.Z);
+                            if (other.Loaded == true && curr.Coords.Neighbors(ref other.Coords) == 1)
+                            {
+                                curr.LightDependenciesFlag |= 1;
+                            }
+                        }
+                        //-x
+                        if (((curr.LightDependenciesFlag & 2) != 2))
+                        {
+                            curr.Coords.GetShiftedX(-1, out coords);
+                            other = _chunkStorage.GetChunk(coords.X, coords.Z);
+                            if (other.Loaded == true && curr.Coords.Neighbors(ref other.Coords) == 2)
+                            {
+                                curr.LightDependenciesFlag |= 2;
+                            }
+                        }
+                        //+z
+                        if (((curr.LightDependenciesFlag & 4) != 4))
+                        {
+                            curr.Coords.GetShiftedZ(1, out coords);
+                            other = _chunkStorage.GetChunk(coords.X, coords.Z);
+                            if (other.Loaded == true && curr.Coords.Neighbors(ref other.Coords) == 4)
+                            {
+                                curr.LightDependenciesFlag |= 4;
+                            }
+                        }
+                        //-z
+                        if (((curr.LightDependenciesFlag & 8) != 8))
+                        {
+                            curr.Coords.GetShiftedZ(-1, out coords);
+                            other = _chunkStorage.GetChunk(coords.X, coords.Z);
+                            if (other.Loaded == true && curr.Coords.Neighbors(ref other.Coords) == 8)
+                            {
+                                curr.LightDependenciesFlag |= 8;
+                            }
+                        }
+
+                    }
+                }
+            }
+
+            for (int i = 0; i < AwaitingBuildDependenciesList.Count; i++)
+            {
+                curr = AwaitingBuildDependenciesList[i];
+                if (curr.Unloading)
+                {
+                    AwaitingBuildDependenciesList.Remove(curr);
+                    continue;
+                }
                 if (curr.Coords.Distance(ref playerPosition) <= CHUNK_BUILD_DIST)
                 {
-                    if (curr.DependenciesFlag == Chunk.DEPENDENCIES_MET_FLAG_VALUE)
+                    if (curr.BuildDependenciesFlag == Chunk.DEPENDENCIES_MET_FLAG_VALUE)
                     {
-                        ChunksToBuild.Enqueue(curr);
-                        UnbuiltChunks.Remove(curr);
-                    }
-                    else
-                    {
-                        
-                        if ((curr.DependenciesFlag & 1) != 1)
-                        {
-                            coords = curr.Coords.GetShiftedX(1);
-                            if (!m_chunkStorage.Contains(ref coords))
-                            {
-                                if (!m_loadQueue.Contains(coords)) m_loadQueue.Enqueue(coords);
-                            }
-                            else
-                            {
-                                curr.DependenciesFlag |= 1;
-                            }
-                        }
-
-                        if ((curr.DependenciesFlag & 2) != 2)
-                        {
-                            coords = curr.Coords.GetShiftedX(-1);
-                            if (!m_chunkStorage.Contains(ref coords))
-                            {
-                                if (!m_loadQueue.Contains(coords)) m_loadQueue.Enqueue(coords);
-                            }
-                            else
-                            {
-                                curr.DependenciesFlag |= 2;
-                            }
-                        }
-
-                        if ((curr.DependenciesFlag & 4) != 4)
-                        {
-                            coords = curr.Coords.GetShiftedZ(1);
-                            if (!m_chunkStorage.Contains(ref coords))
-                            {
-                                if (!m_loadQueue.Contains(coords)) m_loadQueue.Enqueue(coords);
-                            }
-                            else
-                            {
-                                curr.DependenciesFlag |= 4;
-                            }
-                        }
-
-                        if ((curr.DependenciesFlag & 8) != 8)
-                        {
-                            coords = curr.Coords.GetShiftedZ(-1);
-                            if (!m_chunkStorage.Contains(ref coords))
-                            {
-                                if (!m_loadQueue.Contains(coords)) m_loadQueue.Enqueue(coords);
-                            }
-                            else
-                            {
-                                curr.DependenciesFlag |= 8;
-                            }
-                        }
+                        BuildQueue.Enqueue(curr);
+                        AwaitingBuildDependenciesList.Remove(curr);
                     }
                 }
-                else break;
             }
-
-
         }
 
+        ChunkNoise noise = new ChunkNoise(1);
         public void LoadChunks(Object threadContext)
         {
-            int loadedThisFrame = 0;
+            
             Chunk curr;
-            Cube dirt = new Cube(CubeType.Dirt);
             Cube air = new Cube(CubeType.Air);
+            Cube cube;
+            float noisevalue;
+            int worldX;
+            int worldZ;
+            int height;
+            float invHeight = 1.0f/Chunk.HEIGHT;
 
-            while(m_loadQueue.Count>0 && (PER_FRAME_CHUNKS_LOAD-loadedThisFrame) >0)
+            float[,] heightmap = new float[Chunk.WIDTH, Chunk.WIDTH];
+
+            if (UseThreading)
             {
-                curr = new Chunk(this, m_loadQueue.Dequeue());
-                if (!curr.LoadFromDisk())
+                while (loadDone)
                 {
-                    //Generate using terrain generation
-                    for (int x = 0; x < Chunk.WIDTH; x++)
-                        for (int y = 0; y < Chunk.HEIGHT; y++)
-                            for (int z = 0; z < Chunk.WIDTH; z++)
-                            {
-                                if (XerUtilities.Common.MathLib.NextRandom() > 0.5f)
-                                {
-                                    curr.SetCube(x, y, z, ref dirt);
-                                }
-                                else curr.SetCube(x, y, z, ref air);
-                            }
-                }
+                    Monitor.Enter(_loadQueue);
+                    Monitor.Wait(_loadQueue, 100); while (_loadQueue.Count == 0) Monitor.Wait(_loadQueue, 100);
+                    Monitor.Exit(_loadQueue);
 
-                m_chunkStorage.Store(curr, ChunksToUnload);
-                UnbuiltChunks.Add(curr);
-                m_unbuiltChunksSortNeeded = true;
-                ChunkLoadedEvent(this, curr);
-                loadedThisFrame += 1;                
+                    while (_loadQueue.Count > 0)
+                    {
+                        curr = _loadQueue.Dequeue();
+                        if (curr.Unloading) continue;
+                        
+                        if (!curr.LoadFromDisk())
+                        {
+                            //Generate using terrain generation
+                            //Get the heightmap
+                            noise.FillMap2D(heightmap, curr.Coords.X, curr.Coords.Z, octaves: 5, startFrequency: .03f, startAmplitude: 20);
+                            for (int x = 0; x < Chunk.WIDTH; x++)
+                            {
+                                worldX = x + curr.Coords.X * Chunk.WIDTH;
+                                for (int z = 0; z < Chunk.WIDTH; z++)
+                                {                                    
+                                    worldZ = z + curr.Coords.Z * Chunk.WIDTH;
+
+                                    height = (int)(heightmap[x, z] + Settings.SEA_LEVEL);
+                                    
+                                    //Create ground
+                                    for (int y = 0; y < height; y++)
+                                    {
+                                        cube = new Cube(CubeType.Stone);
+                                        curr.SetCube(x, y, z, ref cube);
+                                    }
+
+                                    //Create mountains
+
+                                    for (int y = height; y < Chunk.HEIGHT; y++)
+                                    {
+                                        noisevalue = noise.GetValue3D(worldX, y, worldZ, octaves: 6, startFrequency: .05f, startAmplitude: 2);
+                                        MathHelper.Clamp(noisevalue, -1, 1);
+                                        noisevalue -= 2 * height * invHeight;
+
+                                        if (noisevalue > 0)
+                                        {
+                                            cube = new Cube(CubeType.Dirt);
+                                            curr.SetCube(x, y, z, ref cube);
+                                        }
+                                        else
+                                        {
+                                            cube = new Cube(CubeType.Air);
+                                            curr.SetCube(x, y, z, ref cube);
+                                        }
+                                    }
+
+                                }
+                            }
+                        }
+                        curr.Loaded = true;
+
+                        AwaitingLightDependenciesList.Add(curr);
+                        _awaitingLightSortNeeded = true;
+                        ChunkLoadedEvent(this, curr);
+                    }
+                }
             }
-            loadDone = true;
+            else            
+            {
+                int loadedThisFrame = 0;
+                while (_loadQueue.Count > 0 && (PER_TICK_CHUNKS_LOAD - loadedThisFrame) > 0)
+                {
+                    curr = _loadQueue.Dequeue();
+                    if (curr.Unloading) continue;
+
+                    if (!curr.LoadFromDisk())
+                    {
+                        //Generate using terrain generation
+                        for (int x = 0; x < Chunk.WIDTH; x++)
+                            for (int y = 0; y < Chunk.HEIGHT; y++)
+                                for (int z = 0; z < Chunk.WIDTH; z++)
+                                {
+
+
+                                }
+                    }
+
+                    loadedThisFrame += 1;
+
+                    curr.Loaded = true;
+
+                    AwaitingLightDependenciesList.Add(curr);
+                    _awaitingLightSortNeeded = true;
+                    ChunkLoadedEvent(this, curr);
+                }
+            }
         }
 
-        public void BuildChunkVertices(Object threadContext)
+        public void LightChunks(Object threadContext)
         {
-            int chunksBuiltThisFrame = 0;
+            
 
             Chunk curr;
             Chunk posX = null;
             Chunk negX = null;
-            Chunk posY = null;
-            Chunk negY = null;
-            while (ChunksToBuild.Count > 0 && PER_FRAME_CHUNKS_BUILD - chunksBuiltThisFrame >= 0)
+            Chunk posZ = null;
+            Chunk negZ = null;
+
+            if (UseThreading)
             {
-                curr = ChunksToBuild.Dequeue();
-                negX = m_chunkStorage.GetChunk(curr.Coords.X - 1, curr.Coords.Z);
-                posX = m_chunkStorage.GetChunk(curr.Coords.X + 1, curr.Coords.Z);
-                negY = m_chunkStorage.GetChunk(curr.Coords.X, curr.Coords.Z - 1);
-                posY = m_chunkStorage.GetChunk(curr.Coords.X, curr.Coords.Z + 1);
+                while (lightDone)
+                {
+                    Monitor.Enter(LightQueue);
+                    Monitor.Wait(LightQueue, 100);//while (LightQueue.Count == 0) Monitor.Wait(LightQueue, 500);
+                    Monitor.Exit(LightQueue);
 
-                curr.BuildVertices(m_vertexBuffer, m_graphics, posX, negX, posY, negY);
+                    while (LightQueue.Count > 0)
+                    {
+                        curr = LightQueue.Dequeue();
+                        if (curr.Unloading) continue;
 
-                if(curr.Meshes.Count > 0 && !ChunksToDraw.Contains(curr)) ChunksToDraw.Add(curr);
+                        negX = _chunkStorage.GetChunk(curr.Coords.X - 1, curr.Coords.Z);
+                        posX = _chunkStorage.GetChunk(curr.Coords.X + 1, curr.Coords.Z);
+                        negZ = _chunkStorage.GetChunk(curr.Coords.X, curr.Coords.Z - 1);
+                        posZ = _chunkStorage.GetChunk(curr.Coords.X, curr.Coords.Z + 1);
 
-                chunksBuiltThisFrame += 1;
+                        curr.PropagateSun(posX, negX, posZ, negZ);
+
+                        AwaitingBuildDependenciesList.Add(curr);
+                        _awaitingBuildSortNeeded = true;
+                        ChunkLitEvent(this, curr);
+                    }
+                }
             }
+            else
+            {
+                int chunksLitThisFrame = 0;
+                while (LightQueue.Count > 0 && PER_TICK_CHUNKS_LIGHT - chunksLitThisFrame >= 0)
+                {
+                    curr = LightQueue.Dequeue();
+                    if (curr.Unloading) continue;
 
-            buildDone = true;
+                    negX = _chunkStorage.GetChunk(curr.Coords.X - 1, curr.Coords.Z);
+                    posX = _chunkStorage.GetChunk(curr.Coords.X + 1, curr.Coords.Z);
+                    negZ = _chunkStorage.GetChunk(curr.Coords.X, curr.Coords.Z - 1);
+                    posZ = _chunkStorage.GetChunk(curr.Coords.X, curr.Coords.Z + 1);
+
+                    curr.PropagateSun(posX, negX, posZ, negZ);
+
+                    chunksLitThisFrame += 1;
+
+                    AwaitingBuildDependenciesList.Add(curr);
+                    _awaitingBuildSortNeeded = true;
+                    ChunkLitEvent(this, curr);
+                }
+            }
         }
+
+        public void BuildChunkVertices(Object threadContext)
+        { 
+            Chunk curr;
+            Chunk posX = null;
+            Chunk negX = null;
+            Chunk posZ = null;
+            Chunk negZ = null;
+
+            if (UseThreading)
+            {
+                while (buildDone)
+                {
+                    Monitor.Enter(BuildQueue);
+                    Monitor.Wait(BuildQueue, 100); //while (BuildQueue.Count == 0) Monitor.Wait(BuildQueue, 500);
+                    Monitor.Exit(BuildQueue);
+
+                    while (BuildQueue.Count > 0)
+                    {
+                        curr = BuildQueue.Dequeue();
+                        if (curr.Unloading) continue;
+
+                        negX = _chunkStorage.GetChunk(curr.Coords.X - 1, curr.Coords.Z);
+                        posX = _chunkStorage.GetChunk(curr.Coords.X + 1, curr.Coords.Z);
+                        negZ = _chunkStorage.GetChunk(curr.Coords.X, curr.Coords.Z - 1);
+                        posZ = _chunkStorage.GetChunk(curr.Coords.X, curr.Coords.Z + 1);
+
+                        curr.BuildVertices(_vertexBuffer, m_graphics, posX, negX, posZ, negZ);
+
+                        if (curr.Meshes.Count > 0 && !DrawList.Contains(curr)) DrawList.Add(curr);
+                    }
+                }
+            }
+            else
+            {
+                int chunksBuiltThisFrame = 0;
+                while (BuildQueue.Count > 0 && PER_TICK_CHUNKS_BUILD - chunksBuiltThisFrame >= 0)
+                {
+                    curr = BuildQueue.Dequeue();
+                    if (curr.Unloading) continue;
+
+                    negX = _chunkStorage.GetChunk(curr.Coords.X - 1, curr.Coords.Z);
+                    posX = _chunkStorage.GetChunk(curr.Coords.X + 1, curr.Coords.Z);
+                    negZ = _chunkStorage.GetChunk(curr.Coords.X, curr.Coords.Z - 1);
+                    posZ = _chunkStorage.GetChunk(curr.Coords.X, curr.Coords.Z + 1);
+
+                    curr.BuildVertices(_vertexBuffer, m_graphics, posX, negX, posZ, negZ);
+
+                    if (curr.Meshes.Count > 0 && !DrawList.Contains(curr)) DrawList.Add(curr);
+
+                    chunksBuiltThisFrame += 1;
+                }
+            }
+        }
+
 
         public void RebuildChunkVertices()
         {
@@ -274,22 +663,53 @@ namespace CubeEngine.Basic
         {
         }
 
+        public void PrepareChunkForUnload(Chunk chunk)
+        {
+            chunk.Unloading = true;
+            ChunkLoadingEvent -= chunk.ChunkLoadingCallback;
+            ChunkLoadedEvent -= chunk.ChunkLoadedCallback;
+            ChunkLitEvent -= chunk.ChunkLitCallback;
+            DrawList.Remove(chunk);
+        }
+
         public void UnloadChunks(Object threadContext)
         {
             bool closing = (bool)threadContext;
             if (!closing)
             {
 		        Chunk temp;
-                for (int i = 0; i < ChunksToUnload.Count; i++)
+                for (int i = 0; i < UnloadQueue.Count; i++)
                 {
-
-                    temp = ChunksToUnload.Dequeue();
-                    if(temp.ChangedSinceLoad) temp.SaveToDisk();
+                    temp = UnloadQueue.Dequeue();
+                    if(temp.ChangedSinceLoad) temp.SaveToDisk();                    
                     temp.Dispose();
                 }
             }
 
             unloadDone = true;
+        }
+
+        public void PrintStats()
+        {
+            Chunk curr;
+
+            log.Write("ManagerStats", "--Light Dependencies--", AwaitingLightDependenciesList.Count.ToString());
+            for (int i = 0; i < AwaitingLightDependenciesList.Count; i++)
+            {
+                curr = AwaitingLightDependenciesList[i];
+                log.Write("ManagerStats", curr.ObjectNumber.ToString(), curr.ToString());
+            }
+            log.Write("ManagerStats", "--Build Dependencies--", AwaitingBuildDependenciesList.Count.ToString());
+            for (int i = 0; i < AwaitingBuildDependenciesList.Count; i++)
+            {
+                curr = AwaitingBuildDependenciesList[i];
+                log.Write("ManagerStats", curr.ObjectNumber.ToString(), curr.ToString());
+            }
+            StringBuilder builder = new StringBuilder();
+            builder.AppendLine();
+            builder.AppendLine("light: " + LightQueue.Count.ToString() + "|build: " + BuildQueue.Count.ToString() + "|rebuild: " + RebuildQueue.Count.ToString());
+            builder.AppendLine("draw: " + DrawList.Count.ToString() + "|unload: " + UnloadQueue.Count.ToString());
+            log.Write("ManagerStats", "--Everything Else--", builder.ToString());
         }
     }
 }

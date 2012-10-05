@@ -114,10 +114,15 @@
     <Compile Include="Basic\ChunkManager.cs" />
     <Compile Include="Basic\Cube.cs" />
     <Compile Include="Basic\ChunkSubMesh.cs" />
+    <Compile Include="Basic\CubeStorage.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="CubeEngineGame.cs" />
     <Compile Include="Rendering\CubeVertex.cs" />
+    <Compile Include="Settings.cs" />
+    <Compile Include="Utilities\Noise\ChunkNoise.cs" />
+    <Compile Include="Utilities\Noise\NoiseBase.cs" />
+    <Compile Include="Utilities\Noise\SimplexNoise.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Game.ico" />

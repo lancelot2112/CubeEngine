@@ -7,7 +7,7 @@
       <Importer>FontDescriptionImporter</Importer>
       <Processor>FontDescriptionProcessor</Processor>
       <Options>None</Options>
-      <Output>C:\Users\Lancer\Dropbox\Projects\CubeEngine\CubeEngine\CubeEngine\bin\x86\Debug\Content\Font\Arial.xnb</Output>
+      <Output>C:\Users\Lancer\Dropbox\Projects\CubeEngine\CubeEngine\CubeEngine\bin\x86\Release\Content\Font\Arial.xnb</Output>
       <Time>2012-09-18T20:49:57.8076-04:00</Time>
     </Item>
     <Item>
@@ -16,19 +16,19 @@
       <Importer>EffectImporter</Importer>
       <Processor>EffectProcessor</Processor>
       <Options>None</Options>
-      <Output>C:\Users\Lancer\Dropbox\Projects\CubeEngine\CubeEngine\CubeEngine\bin\x86\Debug\Content\Effects\CubeEffect.xnb</Output>
+      <Output>C:\Users\Lancer\Dropbox\Projects\CubeEngine\CubeEngine\CubeEngine\bin\x86\Release\Content\Effects\CubeEffect.xnb</Output>
       <Time>2012-09-30T17:01:35.6614-04:00</Time>
     </Item>
     <BuildSuccessful>true</BuildSuccessful>
     <Settings>
       <TargetPlatform>Windows</TargetPlatform>
       <TargetProfile>HiDef</TargetProfile>
-      <BuildConfiguration>Debug</BuildConfiguration>
-      <CompressContent>false</CompressContent>
+      <BuildConfiguration>Release</BuildConfiguration>
+      <CompressContent>true</CompressContent>
       <RootDirectory>C:\Users\Lancer\Dropbox\Projects\CubeEngine\CubeEngine\CubeEngineContent\</RootDirectory>
       <LoggerRootDirectory>C:\Users\Lancer\Dropbox\Projects\CubeEngine\CubeEngine\CubeEngine\</LoggerRootDirectory>
-      <IntermediateDirectory>C:\Users\Lancer\Dropbox\Projects\CubeEngine\CubeEngine\CubeEngineContent\obj\x86\Debug\</IntermediateDirectory>
-      <OutputDirectory>C:\Users\Lancer\Dropbox\Projects\CubeEngine\CubeEngine\CubeEngine\bin\x86\Debug\Content\</OutputDirectory>
+      <IntermediateDirectory>C:\Users\Lancer\Dropbox\Projects\CubeEngine\CubeEngine\CubeEngineContent\obj\x86\Release\</IntermediateDirectory>
+      <OutputDirectory>C:\Users\Lancer\Dropbox\Projects\CubeEngine\CubeEngine\CubeEngine\bin\x86\Release\Content\</OutputDirectory>
     </Settings>
     <Assemblies>
       <Assembly>

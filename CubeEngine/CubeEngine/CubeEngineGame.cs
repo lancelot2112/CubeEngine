@@ -27,7 +27,7 @@ namespace CubeEngine
         ChunkManager chunkManager;
         XerInput input;
         DeltaFreeCamera camera;
-        BasicEffect effect;
+        Effect effect;
         RasterizerState currentRaster;
 
         public CubeEngineGame()
@@ -56,10 +56,9 @@ namespace CubeEngine
         /// </summary>
         protected override void LoadContent()
         {
-            effect = new BasicEffect(GraphicsDevice);
-            effect.VertexColorEnabled = true;
-            chunkManager = new ChunkManager(GraphicsDevice, new ChunkCoords(0,0,20));
-            currentRaster = RasterizerState.CullCounterClockwise;
+            effect = Content.Load<Effect>("Effects/CubeEffect");
+            chunkManager = new ChunkManager(GraphicsDevice, new ChunkCoords(0,0,8000), new Vector3(0f,160f,0f), true);
+            currentRaster = RasterizerState.CullNone;
 
             // TODO: use this.Content to load your game content here
         }
@@ -78,11 +77,20 @@ namespace CubeEngine
         /// checking for collisions, gathering input, and playing audio.
         /// </summary>
         /// <param name="gameTime">Provides a snapshot of timing values.</param>
+        ChunkCoords prevPosition = new ChunkCoords();
+        Vector2 move = Vector2.Zero;
         protected override void Update(GameTime gameTime)
         {
             float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
             camera.Update(dt);
-            chunkManager.Update(dt, new ChunkCoords(), camera.Translation);
+
+            move.X += camera.Translation.X;
+            move.Y += camera.Translation.Z;
+
+            prevPosition.X = (int)(move.X / Chunk.WIDTH);
+            prevPosition.Z = (int)(move.Y / Chunk.WIDTH);
+
+            chunkManager.Update(dt, prevPosition, camera.Translation);
 
             if(input.Keyboard.F2JustPressed) 
             {
@@ -90,6 +98,11 @@ namespace CubeEngine
                 currentRaster = new RasterizerState();
                 currentRaster.CullMode = previous.FillMode == FillMode.Solid ? CullMode.None : CullMode.CullCounterClockwiseFace;
                 currentRaster.FillMode = previous.FillMode == FillMode.Solid ? FillMode.WireFrame : FillMode.Solid;  
+            }
+
+            if (input.Keyboard.F3JustPressed)
+            {
+                chunkManager.PrintStats();
             }
 
             // TODO: Add your update logic here
@@ -108,29 +121,35 @@ namespace CubeEngine
 
             GraphicsDevice.Clear(Color.CornflowerBlue);
 
-            effect.Projection = camera.Projection;
-            effect.View = camera.View;
+            effect.Parameters["Projection"].SetValue(camera.Projection);
+            effect.Parameters["View"].SetValue(camera.View);
+            effect.Parameters["SkyLightDir"].SetValue(Vector3.Normalize(new Vector3(0.5f,0.75f,1.0f)));
 
             int VerticesDrawn = 0;
             int SidesDrawn = 0;
-            int CubesDrawn = 0;            
+            int CubesDrawn = 0;
+            int SubMeshesDrawn = 0;
+            int TotalSubMeshes = 0;
 
             Chunk chunk;
             ChunkSubMesh mesh;
             BoundingBox bound;
 
-            for (int i = 0; i < chunkManager.ChunksToDraw.Count; i++)
+            for (int i = 0; i < chunkManager.DrawList.Count; i++)
             {
-            chunk = chunkManager.ChunksToDraw[i];
+            chunk = chunkManager.DrawList[i];
                 for (int j = 0; j < chunk.Meshes.Count; j++)
                 {
                     mesh = chunk.Meshes[j];
+                    mesh.Update(chunk.Position);
                     mesh.GetBoundingBox(out bound);
+                    //BoundingBoxRenderer.Render(bound,GraphicsDevice,camera.View,camera.Projection, Color.Blue);
+                    TotalSubMeshes += 1;
                     if (camera.ViewFrustum.Contains(bound) != ContainmentType.Disjoint)
                     {
-                        effect.World = Matrix.CreateTranslation(mesh.Position);
+                        effect.Parameters["World"].SetValue(Matrix.CreateTranslation(mesh.Position));
 
-                        mesh.GetBoundingBox(out bound);
+                        SubMeshesDrawn++;
 
                         GraphicsDevice.SetVertexBuffer(mesh.VertexBuffer);
 
@@ -149,11 +168,20 @@ namespace CubeEngine
             
 
 
-            debug.DebugDisplay.AddLine(1,"Vertices Drawn: " + VerticesDrawn.ToString());
-            debug.DebugDisplay.AddLine(2,"Sides Drawn: " + SidesDrawn.ToString());
-            debug.DebugDisplay.AddLine(3,"Cubes Drawn: " + CubesDrawn.ToString());
-            debug.DebugDisplay.AddLine(4, "Chunks Drawn: " + chunkManager.ChunksToDraw.Count.ToString());
-            
+            debug.DebugDisplay.AddLine(1,"vertices: " + (VerticesDrawn*.00001f).ToString() + "*10^6");
+            debug.DebugDisplay.AddLine(2,"sides: " + (SidesDrawn*.00001f).ToString() + "*10^6");
+            debug.DebugDisplay.AddLine(3,"cube: " + (CubesDrawn*.001f).ToString() + "*10^4");
+            debug.DebugDisplay.AddLine(4,"mesh: " + SubMeshesDrawn.ToString() + "/" + TotalSubMeshes.ToString());
+            debug.DebugDisplay.AddLine(5, "chunk: " + chunkManager.DrawList.Count.ToString() + "/" + chunkManager.LoadedChunkCount.ToString());
+            debug.DebugDisplay.AddLine(6, "pos: " + prevPosition.ToString());
+            debug.DebugDisplay.AddLine(7, "updateTotal: " + chunkManager.TotalUpdateTime.ToString() + " ms");
+            debug.DebugDisplay.AddLine(8, "queue: " + chunkManager.QueueTime.ToString() + " ms");
+            debug.DebugDisplay.AddLine(9, "load: " + chunkManager.LoadTime.ToString() + " ms");
+            debug.DebugDisplay.AddLine(10, "light: " + chunkManager.LightTime.ToString() + " ms");
+            debug.DebugDisplay.AddLine(11, "build: " + chunkManager.BuildTime.ToString() + " ms");
+            debug.DebugDisplay.AddLine(12, "rebuild: " + chunkManager.RebuildTime.ToString() + " ms");
+            debug.DebugDisplay.AddLine(13, "update: " + chunkManager.UpdateTime.ToString() + " ms");
+            debug.DebugDisplay.AddLine(14, "unload: " + chunkManager.UnloadTime.ToString() + " ms");
             // TODO: Add your drawing code here
 
             base.Draw(gameTime);

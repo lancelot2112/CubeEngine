@@ -6,16 +6,16 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using CubeEngine.Rendering;
 
+
+
 namespace CubeEngine.Basic
-{
+{    
     public class ChunkSubMesh
     {
-        public const int SIZE_X = Chunk.WIDTH;
-        public const int SIZE_Y = Chunk.WIDTH;
-        public const int SIZE_Z = Chunk.WIDTH;
+        
 
-        private int m_yStartIndex;
-        private int m_yEndIndex;
+        private int _yStartIndex;
+        private int _yEndIndex;
         public Vector3 Offset;
         public Vector3 Position;
 
@@ -26,30 +26,40 @@ namespace CubeEngine.Basic
         //Render Members
         public bool AllowRender;
         public bool Empty;
-        public VertexBuffer VertexBuffer;        
+        public bool SideCountNeeded;
+        public VertexBuffer VertexBuffer;
 
-        public ChunkSubMesh(int yStartIndex)
+        public ChunkSubMesh(int yStartIndex, ref Vector3 chunkPosition)
         {
-            m_yStartIndex = yStartIndex;
-            m_yEndIndex = yStartIndex + SIZE_Z;
+            _yStartIndex = yStartIndex;
+            _yEndIndex = yStartIndex + Chunk.WIDTH - 1;
 
             Offset = Vector3.Up * yStartIndex;
+            Vector3.Add(ref Offset, ref chunkPosition, out Position);
+
+            SideCountNeeded = true;
         }
 
         public void GetBoundingBox(out BoundingBox boundingBox)
         {
-            boundingBox.Max = Position + new Vector3(SIZE_X, SIZE_Y, SIZE_Z);
-            boundingBox.Min = Position;            
+            boundingBox.Min = Position;  
+            boundingBox.Max = boundingBox.Min + new Vector3(Chunk.WIDTH, Chunk.WIDTH, Chunk.WIDTH);
+                      
         }
 
         public void Update(Vector3 chunkPosition)
         {
             Vector3.Add(ref chunkPosition, ref Offset, out Position);
         }
-        public void BuildVertices(List<VertexPositionColor> vertexList, GraphicsDevice graphics, Cube[,,] parentCubes, Chunk posX, Chunk negX, Chunk posZ, Chunk negZ)
+        public void BuildVertices(CubeVertex[] vertexBuffer, GraphicsDevice graphics, Cube[,,] parentCubes, Chunk posX, Chunk negX, Chunk posZ, Chunk negZ)
         {
+            if (SideCountNeeded) Initialize(parentCubes, posX, negX, posZ, negZ);
+            if (vertexBuffer.Length < SidesRenderable * 6f) vertexBuffer = new CubeVertex[(int)(SidesRenderable * 6.25f)];
+            
+            Cube current;
             Cube neighbor;
-            Cube current;            
+
+            int i = 0;
             Vector3 offset;
             Vector3 pos1;
             Vector3 pos2;
@@ -58,147 +68,179 @@ namespace CubeEngine.Basic
             Vector3 pos5;
             Vector3 pos6;
             Vector3 pos7;
-            Vector3 pos8;
+            Vector3 pos8;            
 
-            CubeVertex vertex;
-
-            Color color;
-
-            for (byte x = 0; x < SIZE_X; x++)
-                for (byte y = 0; y < SIZE_Y; y++)
-                    for (byte z = 0; z < SIZE_Z; z++)
+            int maxIndex = Chunk.WIDTH - 1;
+            for (int x = 0; x < Chunk.WIDTH; x++)
+                for (int y = _yStartIndex; y <= _yEndIndex; y++)
+                    for (int z = 0; z < Chunk.WIDTH; z++)
                     {
                         current = parentCubes[x, y, z];
-                        if (!current.IsRenderable()) continue;                        
+                        if (!current.IsRenderable()) continue;
 
                         SolidBlocks += 1;
 
                         offset.X = x;
-                        offset.Y = y;
+                        offset.Y = y - _yStartIndex;
                         offset.Z = z;
 
-                        pos1 = CubeVertex.CORNER_NNN + offset;
-                        pos2 = CubeVertex.CORNER_NNP + offset;
-                        pos3 = CubeVertex.CORNER_NPN + offset;
-                        pos4 = CubeVertex.CORNER_NPP + offset;
-                        pos5 = CubeVertex.CORNER_PNN + offset;
-                        pos6 = CubeVertex.CORNER_PNP + offset;
-                        pos7 = CubeVertex.CORNER_PPN + offset;
-                        pos8 = CubeVertex.CORNER_PPP + offset;
-
-                        color = new Color(current.Red, current.Green, current.Blue); 
+                        Vector3.Add(ref CubeVertex.CORNER_NNN, ref offset, out pos1);
+                        Vector3.Add(ref CubeVertex.CORNER_NNP, ref offset, out pos2);
+                        Vector3.Add(ref CubeVertex.CORNER_NPN, ref offset, out pos3);
+                        Vector3.Add(ref CubeVertex.CORNER_NPP, ref offset, out pos4);
+                        Vector3.Add(ref CubeVertex.CORNER_PNN, ref offset, out pos5);
+                        Vector3.Add(ref CubeVertex.CORNER_PNP, ref offset, out pos6);
+                        Vector3.Add(ref CubeVertex.CORNER_PPN, ref offset, out pos7);
+                        Vector3.Add(ref CubeVertex.CORNER_PPP, ref offset, out pos8);
 
                         //-x
-                        if (x == 0) neighbor = (negX != null) ? negX.GetCube(SIZE_X - 1, y, z) : Cube.AIR;
+                        if (x == 0) neighbor = negX.GetCube(maxIndex, y, z);
                         else neighbor = parentCubes[x - 1, y, z];
 
                         if (neighbor.IsTransparent())
                         {
-                            vertexList.Add(new VertexPositionColor(pos3, color));
-                            vertexList.Add(new VertexPositionColor(pos4, color));
-                            vertexList.Add(new VertexPositionColor(pos1, color));
-                            vertexList.Add(new VertexPositionColor(pos1, color));
-                            vertexList.Add(new VertexPositionColor(pos4, color));
-                            vertexList.Add(new VertexPositionColor(pos2, color));                            
-
-                            SidesRenderable += 1;
+                            vertexBuffer[i++] = new CubeVertex(ref pos3, ref CubeVertex.N_NEG_X, ref CubeVertex.TC00, ref current, ref neighbor);
+                            vertexBuffer[i++] = new CubeVertex(ref pos4, ref CubeVertex.N_NEG_X, ref CubeVertex.TC10, ref current, ref neighbor);
+                            vertexBuffer[i++] = new CubeVertex(ref pos1, ref CubeVertex.N_NEG_X, ref CubeVertex.TC01, ref current, ref neighbor);
+                            vertexBuffer[i++] = new CubeVertex(ref pos1, ref CubeVertex.N_NEG_X, ref CubeVertex.TC01, ref current, ref neighbor);
+                            vertexBuffer[i++] = new CubeVertex(ref pos4, ref CubeVertex.N_NEG_X, ref CubeVertex.TC10, ref current, ref neighbor);
+                            vertexBuffer[i++] = new CubeVertex(ref pos2, ref CubeVertex.N_NEG_X, ref CubeVertex.TC11, ref current, ref neighbor);                       
                         }
 
                         //+x
-                        if (x == SIZE_X - 1) neighbor = (posX != null) ? posX.GetCube(0, y, z) : Cube.AIR;
+                        if (x == maxIndex) neighbor = posX.GetCube(0, y, z);
                         else neighbor = parentCubes[x + 1, y, z];
 
                         if (neighbor.IsTransparent())
                         {
-                            vertexList.Add(new VertexPositionColor(pos8, color));
-                            vertexList.Add(new VertexPositionColor(pos7, color));
-                            vertexList.Add(new VertexPositionColor(pos6, color));
-                            vertexList.Add(new VertexPositionColor(pos6, color));
-                            vertexList.Add(new VertexPositionColor(pos7, color));
-                            vertexList.Add(new VertexPositionColor(pos5, color));
-
-                            SidesRenderable += 1;
+                            vertexBuffer[i++] = new CubeVertex(ref pos8, ref CubeVertex.N_POS_X, ref CubeVertex.TC00, ref current, ref neighbor);
+                            vertexBuffer[i++] = new CubeVertex(ref pos7, ref CubeVertex.N_POS_X, ref CubeVertex.TC10, ref current, ref neighbor);
+                            vertexBuffer[i++] = new CubeVertex(ref pos6, ref CubeVertex.N_POS_X, ref CubeVertex.TC01, ref current, ref neighbor);
+                            vertexBuffer[i++] = new CubeVertex(ref pos6, ref CubeVertex.N_POS_X, ref CubeVertex.TC01, ref current, ref neighbor);
+                            vertexBuffer[i++] = new CubeVertex(ref pos7, ref CubeVertex.N_POS_X, ref CubeVertex.TC10, ref current, ref neighbor);
+                            vertexBuffer[i++] = new CubeVertex(ref pos5, ref CubeVertex.N_POS_X, ref CubeVertex.TC11, ref current, ref neighbor);                        
                         }
 
                         //-y
-                        if (y == 0) neighbor = (m_yStartIndex != 0) ? parentCubes[x, m_yStartIndex - 1, z] : Cube.AIR;
+                        if (y == _yStartIndex) neighbor = (_yStartIndex != 0) ? parentCubes[x, y - 1, z] : Cube.NULL;
                         else neighbor = parentCubes[x, y - 1, z];
 
-                        if (neighbor.IsTransparent())
+                        if (neighbor.IsTransparent() && neighbor.Type != CubeType.NULL)
                         {
-                            vertexList.Add(new VertexPositionColor(pos2, color));
-                            vertexList.Add(new VertexPositionColor(pos6, color));
-                            vertexList.Add(new VertexPositionColor(pos1, color));
-                            vertexList.Add(new VertexPositionColor(pos1, color));
-                            vertexList.Add(new VertexPositionColor(pos6, color));
-                            vertexList.Add(new VertexPositionColor(pos5, color));
-
-                            SidesRenderable += 1;
+                            vertexBuffer[i++] = new CubeVertex(ref pos2, ref CubeVertex.N_NEG_Y, ref CubeVertex.TC00, ref current, ref neighbor);
+                            vertexBuffer[i++] = new CubeVertex(ref pos6, ref CubeVertex.N_NEG_Y, ref CubeVertex.TC10, ref current, ref neighbor);
+                            vertexBuffer[i++] = new CubeVertex(ref pos1, ref CubeVertex.N_NEG_Y, ref CubeVertex.TC01, ref current, ref neighbor);
+                            vertexBuffer[i++] = new CubeVertex(ref pos1, ref CubeVertex.N_NEG_Y, ref CubeVertex.TC01, ref current, ref neighbor);
+                            vertexBuffer[i++] = new CubeVertex(ref pos6, ref CubeVertex.N_NEG_Y, ref CubeVertex.TC10, ref current, ref neighbor);
+                            vertexBuffer[i++] = new CubeVertex(ref pos5, ref CubeVertex.N_NEG_Y, ref CubeVertex.TC11, ref current, ref neighbor);
                         }
 
                         //+y
-                        if (y == SIZE_Y - 1) neighbor = (m_yEndIndex != Chunk.HEIGHT) ? parentCubes[x, m_yEndIndex + 1, z] : Cube.AIR;
+                        if (y == _yEndIndex) neighbor = (_yEndIndex != Chunk.HEIGHT-1) ? parentCubes[x, y + 1, z] : Cube.NULL;
                         else neighbor = parentCubes[x, y + 1, z];
 
-                        if (neighbor.IsTransparent())
+                        if (neighbor.IsTransparent() && neighbor.Type != CubeType.NULL)
                         {
-                            vertexList.Add(new VertexPositionColor(pos3, color));
-                            vertexList.Add(new VertexPositionColor(pos7, color));
-                            vertexList.Add(new VertexPositionColor(pos4, color));
-                            vertexList.Add(new VertexPositionColor(pos4, color));
-                            vertexList.Add(new VertexPositionColor(pos7, color));
-                            vertexList.Add(new VertexPositionColor(pos8, color));
-
-                            SidesRenderable += 1;
+                            vertexBuffer[i++] = new CubeVertex(ref pos3, ref CubeVertex.N_POS_Y, ref CubeVertex.TC00, ref current, ref neighbor);
+                            vertexBuffer[i++] = new CubeVertex(ref pos7, ref CubeVertex.N_POS_Y, ref CubeVertex.TC10, ref current, ref neighbor);
+                            vertexBuffer[i++] = new CubeVertex(ref pos4, ref CubeVertex.N_POS_Y, ref CubeVertex.TC01, ref current, ref neighbor);
+                            vertexBuffer[i++] = new CubeVertex(ref pos4, ref CubeVertex.N_POS_Y, ref CubeVertex.TC01, ref current, ref neighbor);
+                            vertexBuffer[i++] = new CubeVertex(ref pos7, ref CubeVertex.N_POS_Y, ref CubeVertex.TC10, ref current, ref neighbor);
+                            vertexBuffer[i++] = new CubeVertex(ref pos8, ref CubeVertex.N_POS_Y, ref CubeVertex.TC11, ref current, ref neighbor);
                         }
 
                         //-z
-                        if (z == 0) neighbor = (negZ != null) ? negZ.GetCube(x, y, SIZE_Z - 1) : Cube.AIR;
+                        if (z == 0) neighbor = negZ.GetCube(x, y, maxIndex);
                         else neighbor = parentCubes[x, y, z - 1];
 
                         if (neighbor.IsTransparent())
                         {
-                            vertexList.Add(new VertexPositionColor(pos7, color));
-                            vertexList.Add(new VertexPositionColor(pos3, color));
-                            vertexList.Add(new VertexPositionColor(pos5, color));
-                            vertexList.Add(new VertexPositionColor(pos5, color));
-                            vertexList.Add(new VertexPositionColor(pos3, color));
-                            vertexList.Add(new VertexPositionColor(pos1, color));
-
-                            SidesRenderable += 1;
+                            vertexBuffer[i++] = new CubeVertex(ref pos7, ref CubeVertex.N_NEG_Z, ref CubeVertex.TC00, ref current, ref neighbor);
+                            vertexBuffer[i++] = new CubeVertex(ref pos3, ref CubeVertex.N_NEG_Z, ref CubeVertex.TC10, ref current, ref neighbor);
+                            vertexBuffer[i++] = new CubeVertex(ref pos5, ref CubeVertex.N_NEG_Z, ref CubeVertex.TC01, ref current, ref neighbor);
+                            vertexBuffer[i++] = new CubeVertex(ref pos5, ref CubeVertex.N_NEG_Z, ref CubeVertex.TC01, ref current, ref neighbor);
+                            vertexBuffer[i++] = new CubeVertex(ref pos3, ref CubeVertex.N_NEG_Z, ref CubeVertex.TC10, ref current, ref neighbor);
+                            vertexBuffer[i++] = new CubeVertex(ref pos1, ref CubeVertex.N_NEG_Z, ref CubeVertex.TC11, ref current, ref neighbor);                      
                         }
 
                         //+z
-                        if (z == SIZE_Z - 1) neighbor = (posZ != null) ? posZ.GetCube(x, y, 0) : Cube.AIR;
+                        if (z == maxIndex) neighbor = posZ.GetCube(x, y, 0);
                         else neighbor = parentCubes[x, y, z + 1];
 
                         if (neighbor.IsTransparent())
                         {
-                            vertexList.Add(new VertexPositionColor(pos4, color));
-                            vertexList.Add(new VertexPositionColor(pos8, color));
-                            vertexList.Add(new VertexPositionColor(pos2, color));
-                            vertexList.Add(new VertexPositionColor(pos2, color));
-                            vertexList.Add(new VertexPositionColor(pos8, color));
-                            vertexList.Add(new VertexPositionColor(pos6, color));
-
-                            SidesRenderable += 1;
+                            vertexBuffer[i++] = new CubeVertex(ref pos4, ref CubeVertex.N_POS_Z, ref CubeVertex.TC00, ref current, ref neighbor);
+                            vertexBuffer[i++] = new CubeVertex(ref pos8, ref CubeVertex.N_POS_Z, ref CubeVertex.TC10, ref current, ref neighbor);
+                            vertexBuffer[i++] = new CubeVertex(ref pos2, ref CubeVertex.N_POS_Z, ref CubeVertex.TC01, ref current, ref neighbor);
+                            vertexBuffer[i++] = new CubeVertex(ref pos2, ref CubeVertex.N_POS_Z, ref CubeVertex.TC01, ref current, ref neighbor);
+                            vertexBuffer[i++] = new CubeVertex(ref pos8, ref CubeVertex.N_POS_Z, ref CubeVertex.TC10, ref current, ref neighbor);
+                            vertexBuffer[i++] = new CubeVertex(ref pos6, ref CubeVertex.N_POS_Z, ref CubeVertex.TC11, ref current, ref neighbor);                        
                         }
                     }
 
-            if (vertexList.Count > 0)
+            if (i > 0)
             {
-                VertexBuffer = new VertexBuffer(graphics, typeof(VertexPositionColor), vertexList.Count, BufferUsage.None);
-                VertexBuffer.SetData<VertexPositionColor>(vertexList.ToArray());
-                vertexList.Clear();
+                VertexBuffer = new VertexBuffer(graphics, typeof(CubeVertex), vertexBuffer.Length, BufferUsage.None);
+                VertexBuffer.SetData<CubeVertex>(vertexBuffer,0,i);
                 Empty = false;
             }
+            else Empty = true;
+        }
 
-            //if (transparentVertexList.Count > 0)
-            //{
-            //    TransparentVertexBuffer = new VertexBuffer(graphics, typeof(VertexPositionColor), transparentVertexList.Count, BufferUsage.None);
-            //    TransparentVertexBuffer.SetData<VertexPositionColor>(transparentVertexList.ToArray());
-            //    transparentVertexList.Clear();
-            //}
+        public void Initialize(Cube[, ,] parentCubes, Chunk posX, Chunk negX, Chunk posZ, Chunk negZ)
+        {
+            SidesRenderable = 0;
+            Cube neighbor;
+            Cube current;
+
+            int maxIndex = Chunk.WIDTH - 1;
+            for (int x = 0; x < Chunk.WIDTH; x++)
+                for (int y = _yStartIndex; y <= _yEndIndex; y++)
+                    for (int z = 0; z < Chunk.WIDTH; z++)
+                    {
+                        current = parentCubes[x, y, z];
+                        if (!current.IsRenderable()) continue;
+
+                        SolidBlocks += 1;
+
+                        //-x
+                        if (x == 0) neighbor = negX.GetCube(maxIndex, y, z);
+                        else neighbor = parentCubes[x - 1, y, z];
+
+                        if (neighbor.IsTransparent()) SidesRenderable += 1;
+
+                        //+x
+                        if (x == maxIndex) neighbor = posX.GetCube(0, y, z);
+                        else neighbor = parentCubes[x + 1, y, z];
+
+                        if (neighbor.IsTransparent()) SidesRenderable += 1;
+
+                        //-y
+                        if (y == _yStartIndex) neighbor = (_yStartIndex != 0) ? parentCubes[x, y - 1, z] : Cube.NULL;
+                        else neighbor = parentCubes[x, y - 1, z];
+
+                        if (neighbor.IsTransparent() && neighbor.Type != CubeType.NULL) SidesRenderable += 1;
+
+                        //+y
+                        if (y == _yEndIndex) neighbor = (_yEndIndex != Chunk.HEIGHT - 1) ? parentCubes[x, y + 1, z] : Cube.NULL;
+                        else neighbor = parentCubes[x, y + 1, z];
+
+                        if (neighbor.IsTransparent() && neighbor.Type != CubeType.NULL) SidesRenderable += 1;
+
+                        //-z
+                        if (z == 0) neighbor = negZ.GetCube(x, y, maxIndex);
+                        else neighbor = parentCubes[x, y, z - 1];
+
+                        if (neighbor.IsTransparent()) SidesRenderable += 1;
+
+                        //+z
+                        if (z == maxIndex) neighbor = posZ.GetCube(x, y, 0);
+                        else neighbor = parentCubes[x, y, z + 1];
+
+                        if (neighbor.IsTransparent()) SidesRenderable += 1;
+                    }
+
+            SideCountNeeded = false;
         }
 
         public void Dispose()

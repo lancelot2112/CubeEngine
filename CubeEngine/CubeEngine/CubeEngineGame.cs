@@ -78,20 +78,17 @@ namespace CubeEngine
         /// </summary>
         /// <param name="gameTime">Provides a snapshot of timing values.</param>
         ChunkCoords prevPosition = new ChunkCoords();
-        float timeTillMove = 0.0f;
-        float TimeToMove = 0.5f;
+        Vector2 move = Vector2.Zero;
         protected override void Update(GameTime gameTime)
         {
             float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
             camera.Update(dt);
 
-            timeTillMove += dt;
-            if (timeTillMove > TimeToMove)
-            {
-                timeTillMove -= TimeToMove;
-                prevPosition.X += 1;
-                prevPosition.Z += 1;
-            }
+            move.X += camera.Translation.X;
+            move.Y += camera.Translation.Z;
+
+            prevPosition.X = (int)(move.X / Chunk.WIDTH);
+            prevPosition.Z = (int)(move.Y / Chunk.WIDTH);
 
             chunkManager.Update(dt, prevPosition, camera.Translation);
 
@@ -144,8 +141,9 @@ namespace CubeEngine
                 for (int j = 0; j < chunk.Meshes.Count; j++)
                 {
                     mesh = chunk.Meshes[j];
+                    mesh.Update(chunk.Position);
                     mesh.GetBoundingBox(out bound);
-                    BoundingBoxRenderer.Render(bound,GraphicsDevice,camera.View,camera.Projection, Color.Blue);
+                    //BoundingBoxRenderer.Render(bound,GraphicsDevice,camera.View,camera.Projection, Color.Blue);
                     TotalSubMeshes += 1;
                     if (camera.ViewFrustum.Contains(bound) != ContainmentType.Disjoint)
                     {

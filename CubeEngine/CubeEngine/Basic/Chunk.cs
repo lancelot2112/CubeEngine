@@ -6,6 +6,7 @@ using System.Text;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using CubeEngine.Rendering;
+using System.Threading;
 
 namespace CubeEngine.Basic
 {
@@ -16,7 +17,7 @@ namespace CubeEngine.Basic
     {
         public static int ObjectCount = 0;
         public const int WIDTH = 16;
-        public const int HEIGHT = 256;
+        public const int HEIGHT = 128;
         public const int DEPENDENCIES_MET_FLAG_VALUE = 15;
 
         /// <summary>
@@ -43,8 +44,8 @@ namespace CubeEngine.Basic
 
         public List<ChunkSubMesh> Meshes;
 
-        private Cube[, ,] m_cubes;
-        private int[,] m_heightMap;
+        private Cube[, ,] _cubes;
+        private int[,] _heightMap;
         
 
         public Chunk(ChunkManager manager, ref ChunkCoords coords, ref Vector3 initialPosition)
@@ -56,8 +57,8 @@ namespace CubeEngine.Basic
             manager.ChunkLitEvent += ChunkLitCallback;
             Position = initialPosition;
             Coords = coords;
-            m_cubes = new Cube[WIDTH, HEIGHT, WIDTH];
-            m_heightMap = new int[WIDTH, WIDTH];
+            _cubes = new Cube[WIDTH, HEIGHT, WIDTH];
+            _heightMap = new int[WIDTH, WIDTH];
             Meshes = new List<ChunkSubMesh>();
 
             ChangedSinceLoad = false;
@@ -67,23 +68,18 @@ namespace CubeEngine.Basic
         public void Update(float dt, Vector3 deltaPosition)
         {
             Position -= deltaPosition;
-
-            for (int i = 0; i < Meshes.Count; i++)
-            {
-                Meshes[i].Update(Position);
-            }
         }
 
         public void SetCube(int x, int y, int z, ref Cube cube)
         {
-            if (InChunk(x, y, z)) m_cubes[x, y, z] = cube;
+            if (InChunk(x, y, z)) _cubes[x, y, z] = cube;
         }
 
         public bool GetCube(int x, int y, int z, out Cube cube)
         {
             if (InChunk(x, y, z))
             {
-                cube = m_cubes[x, y, z];
+                cube = _cubes[x, y, z];
                 return true;
             }
             else
@@ -95,17 +91,17 @@ namespace CubeEngine.Basic
 
         public Cube GetCube(int x, int y, int z)
         {
-            return m_cubes[x, y, z];
+            return _cubes[x, y, z];
         }
 
         public int GetSunLight(int x, int y, int z)
         {
-            return m_cubes[x, y, z].SunLight;
+            return _cubes[x, y, z].SunLight;
         }
 
         public void SetSunLight(int x, int y, int z, int sunLight)
         {
-            m_cubes[x, y, z].SunLight = sunLight;
+            _cubes[x, y, z].SunLight = sunLight;
             Lit = false;
         }
 
@@ -156,7 +152,7 @@ namespace CubeEngine.Basic
             {
                 for (int z = 0; z < WIDTH; z++)
                 {
-                    m_cubes[x, maxIndex, z].SunLight = 15 - m_cubes[x, maxIndex, z].Attenuation();
+                    _cubes[x, maxIndex, z].SunLight = 15 - _cubes[x, maxIndex, z].Attenuation();
                 }
             }
 
@@ -167,25 +163,25 @@ namespace CubeEngine.Basic
                 {
                     for (int z = 0; z < WIDTH; z++)
                     {
-                        if (!m_cubes[x, y, z].IsTransparent()) continue;
+                        if (!_cubes[x, y, z].IsTransparent()) continue;
 
-                        sun = m_cubes[x, y + 1, z].SunLight;
-                        posXsun = ((x == maxIndex) ? posX.GetSunLight(0, y, z) : m_cubes[x + 1, y, z].SunLight) - 1;
+                        sun = _cubes[x, y + 1, z].SunLight;
+                        posXsun = ((x == maxIndex) ? posX.GetSunLight(0, y, z)-1 : _cubes[x + 1, y, z].SunLight) - 1;
                         sun = (sun > posXsun) ? sun : posXsun;
-                        negXsun = ((x == 0) ? negX.GetSunLight(maxIndex, y, z) : m_cubes[x - 1, y, z].SunLight) - 1;
+                        negXsun = ((x == 0) ? negX.GetSunLight(maxIndex, y, z)-1 : _cubes[x - 1, y, z].SunLight) - 1;
                         sun = (sun > negXsun) ? sun : negXsun;
-                        posZsun = ((z == maxIndex) ? posZ.GetSunLight(x, y, 0) : m_cubes[x, y, z + 1].SunLight) - 1;
+                        posZsun = ((z == maxIndex) ? posZ.GetSunLight(x, y, 0)-1 : _cubes[x, y, z + 1].SunLight) - 1;
                         sun = (sun > posZsun) ? sun : posZsun;
-                        negZsun = ((z == 0) ? negZ.GetSunLight(x, y, maxIndex) : m_cubes[x, y, z - 1].SunLight) - 1;
+                        negZsun = ((z == 0) ? negZ.GetSunLight(x, y, maxIndex)-1 : _cubes[x, y, z - 1].SunLight) - 1;
                         sun = (sun > negZsun) ? sun : negZsun;
-                        currSun = m_cubes[x,y,z].SunLight;
-                        m_cubes[x, y, z].SunLight = (currSun > sun) ? currSun : sun;
+                        currSun = _cubes[x,y,z].SunLight;
+                        _cubes[x, y, z].SunLight = (currSun > sun) ? currSun : sun;
 
                         attenuated = sun - 1;
-                        if (posXsun < attenuated && x == maxIndex) posX.SetSunLight(0, y, z, attenuated);
-                        else if (negXsun < attenuated && x == 0) negX.SetSunLight(maxIndex, y, z, attenuated);
-                        if (posZsun < attenuated && z == maxIndex) posZ.SetSunLight(x, y, 0, attenuated);
-                        else if (negZsun < attenuated && z == 0) negZ.SetSunLight(x, y, maxIndex, attenuated);
+                        if (posXsun + 1 < attenuated && x == maxIndex) posX.SetSunLight(0, y, z, attenuated);
+                        else if (negXsun + 1 < attenuated && x == 0) negX.SetSunLight(maxIndex, y, z, attenuated);
+                        if (posZsun + 1 < attenuated && z == maxIndex) posZ.SetSunLight(x, y, 0, attenuated);
+                        else if (negZsun + 1 < attenuated && z == 0) negZ.SetSunLight(x, y, maxIndex, attenuated);
                     }
                 }
             }
@@ -193,18 +189,16 @@ namespace CubeEngine.Basic
             Lit = true;
         }
         public void BuildVertices(CubeVertex[] buffer, GraphicsDevice graphics, Chunk posX, Chunk negX, Chunk posZ, Chunk negZ)
-        {           
-
+        {
             ChunkSubMesh currentMesh;
             int i = 0;
             while(i < HEIGHT)
             {
                 currentMesh = new ChunkSubMesh(i, ref Position);
-                currentMesh.BuildVertices(buffer, graphics, m_cubes, posX, negX, posZ, negZ);
+                currentMesh.BuildVertices(buffer, graphics, _cubes, posX, negX, posZ, negZ);
                 if (!currentMesh.Empty) Meshes.Add(currentMesh);
                 i += Chunk.WIDTH;
             }
-
 
         }
 

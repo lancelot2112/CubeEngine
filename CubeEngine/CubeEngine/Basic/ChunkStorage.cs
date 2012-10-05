@@ -13,15 +13,15 @@ namespace CubeEngine.Basic
         public List<Chunk> LoadedChunks;
         public int LoadedChunkCount { get { return LoadedChunks.Count; } }
 
-        private int m_dimLength;
-        private float m_invDimLength;
+        private int _dimLength;
+        private float _invDimLength;
 
         public ChunkStorage(int radius)
         {
-            m_dimLength = 2 * radius + 2;
-            m_invDimLength = 1 / (float)m_dimLength;
+            _dimLength = 2 * radius + 2;
+            _invDimLength = 1 / (float)_dimLength;
 
-            Chunks = new Chunk[m_dimLength, m_dimLength];
+            Chunks = new Chunk[_dimLength, _dimLength];
             LoadedChunks = new List<Chunk>();
         }
 
@@ -78,15 +78,15 @@ namespace CubeEngine.Basic
 
         public int WrapCoord(int val)
         {
-            if (val >= m_dimLength)
+            if (val >= _dimLength)
             {
-                int scale = (int)(val * m_invDimLength);
-                val -= m_dimLength * scale;
+                int scale = (int)(val * _invDimLength);
+                val -= _dimLength * scale;
             }
             else if (val < 0)
             {
-                int scale = (int)(-val * m_invDimLength+1);
-                val += m_dimLength * scale;
+                int scale = (int)(-val * _invDimLength+1);
+                val += _dimLength * scale;
             }
 
             return val;

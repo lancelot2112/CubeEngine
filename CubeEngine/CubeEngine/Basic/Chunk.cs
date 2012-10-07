@@ -17,7 +17,7 @@ namespace CubeEngine.Basic
     {
         public static int ObjectCount = 0;
         public const int WIDTH = 16;
-        public const int HEIGHT = 128;
+        public const int HEIGHT = 256;
         public const int DEPENDENCIES_MET_FLAG_VALUE = 15;
 
         /// <summary>
@@ -29,8 +29,8 @@ namespace CubeEngine.Basic
         public byte LoadDependenciesFlag;
         public byte LightDependenciesFlag;
         public byte BuildDependenciesFlag;
-        public int XIndex;
-        public int ZIndex;
+        public int Xstart;
+        public int Zstart;
         public int ObjectNumber;
 
         public ChunkCoords Coords;
@@ -43,8 +43,6 @@ namespace CubeEngine.Basic
         public bool ChangedSinceLoad;
 
         public List<ChunkSubMesh> Meshes;
-
-        private Cube[, ,] _cubes;
         private int[,] _heightMap;
         
 
@@ -57,10 +55,12 @@ namespace CubeEngine.Basic
             manager.ChunkLitEvent += ChunkLitCallback;
             Position = initialPosition;
             Coords = coords;
-            _cubes = new Cube[WIDTH, HEIGHT, WIDTH];
             _heightMap = new int[WIDTH, WIDTH];
             Meshes = new List<ChunkSubMesh>();
 
+            Xstart = coords.X * Chunk.WIDTH;
+            Zstart = coords.Z * Chunk.WIDTH;
+            manager.CubeStorage.WrapCoords(ref Xstart, ref Zstart);
             ChangedSinceLoad = false;
             Empty = true;
         }
@@ -68,41 +68,6 @@ namespace CubeEngine.Basic
         public void Update(float dt, Vector3 deltaPosition)
         {
             Position -= deltaPosition;
-        }
-
-        public void SetCube(int x, int y, int z, ref Cube cube)
-        {
-            if (InChunk(x, y, z)) _cubes[x, y, z] = cube;
-        }
-
-        public bool GetCube(int x, int y, int z, out Cube cube)
-        {
-            if (InChunk(x, y, z))
-            {
-                cube = _cubes[x, y, z];
-                return true;
-            }
-            else
-            {
-                cube = Cube.NULL;
-                return false;
-            }
-        }
-
-        public Cube GetCube(int x, int y, int z)
-        {
-            return _cubes[x, y, z];
-        }
-
-        public int GetSunLight(int x, int y, int z)
-        {
-            return _cubes[x, y, z].SunLight;
-        }
-
-        public void SetSunLight(int x, int y, int z, int sunLight)
-        {
-            _cubes[x, y, z].SunLight = sunLight;
-            Lit = false;
         }
 
         public void ChunkLoadingCallback(ChunkManager manager, Chunk chunk)
@@ -120,82 +85,72 @@ namespace CubeEngine.Basic
             BuildDependenciesFlag |= Coords.Neighbors(ref chunk.Coords);
         }
 
-        public bool InChunk(int x, int y, int z)
-        {
-
-            if (x < 0 || x >= WIDTH)
-                return false;
-            if (y < 0 || y >= HEIGHT)
-                return false;
-            if (z < 0 || z >= WIDTH)
-                return false;
-
-            return true;
-        }
-
-        public void PropagateSun(Chunk posX, Chunk negX, Chunk posZ, Chunk negZ)
+        public void PropagateSun(CubeStorage store)
         {
             int maxIndex = HEIGHT-1;
 
             int sun;
-            int currSun;
-
             int posXsun;
             int negXsun;
             int posZsun;
             int negZsun;
-
             int attenuated;
 
+            Cube curr;
+            int startX = WIDTH * Coords.X;
+            int startZ = WIDTH * Coords.Z;
+
+
             //SEED sunlight in the top layer
-            for (int x = 0; x < WIDTH; x++)
+            for (int x = startX; x < startX + WIDTH; x++)
             {
-                for (int z = 0; z < WIDTH; z++)
+                for (int z = startZ; z < startZ + WIDTH; z++)
                 {
-                    _cubes[x, maxIndex, z].SunLight = 15 - _cubes[x, maxIndex, z].Attenuation();
+                    store.SetSunlight(x, maxIndex, z, 15);                    
                 }
             }
 
             maxIndex = WIDTH-1;
+
             for (int y = HEIGHT - 2; y >= 0; y--)
             {
-                for (int x = 0; x < WIDTH; x++)
+                for (int x = startX; x < startX + WIDTH; x++)
                 {
-                    for (int z = 0; z < WIDTH; z++)
+                    for (int z = startZ; z < startZ + WIDTH; z++)
                     {
-                        if (!_cubes[x, y, z].IsTransparent()) continue;
+                        store.GetCube(x, y, z, out curr);
+                        if (!curr.IsTransparent) continue;
 
-                        sun = _cubes[x, y + 1, z].SunLight;
-                        posXsun = ((x == maxIndex) ? posX.GetSunLight(0, y, z)-1 : _cubes[x + 1, y, z].SunLight) - 1;
-                        sun = (sun > posXsun) ? sun : posXsun;
-                        negXsun = ((x == 0) ? negX.GetSunLight(maxIndex, y, z)-1 : _cubes[x - 1, y, z].SunLight) - 1;
-                        sun = (sun > negXsun) ? sun : negXsun;
-                        posZsun = ((z == maxIndex) ? posZ.GetSunLight(x, y, 0)-1 : _cubes[x, y, z + 1].SunLight) - 1;
-                        sun = (sun > posZsun) ? sun : posZsun;
-                        negZsun = ((z == 0) ? negZ.GetSunLight(x, y, maxIndex)-1 : _cubes[x, y, z - 1].SunLight) - 1;
-                        sun = (sun > negZsun) ? sun : negZsun;
-                        currSun = _cubes[x,y,z].SunLight;
-                        _cubes[x, y, z].SunLight = (currSun > sun) ? currSun : sun;
+                        sun = store.GetSunlight(x, y + 1, z);
+                        posXsun = store.GetSunlight(x + 1, y, z) - 1;
+                        if (sun < posXsun) sun = posXsun;
+                        negXsun = store.GetSunlight(x - 1, y, z) - 1;
+                        if (sun < negXsun) sun = negXsun;
+                        posZsun = store.GetSunlight(x, y, z + 1) - 1;
+                        if (sun < posZsun) sun = posZsun;
+                        negZsun = store.GetSunlight(x, y, z - 1) - 1;
+                        if (sun < negZsun) sun = negZsun;
+                        if (sun > curr.SunLight) store.SetSunlight(x, y, z, sun);
 
                         attenuated = sun - 1;
-                        if (posXsun + 1 < attenuated && x == maxIndex) posX.SetSunLight(0, y, z, attenuated);
-                        else if (negXsun + 1 < attenuated && x == 0) negX.SetSunLight(maxIndex, y, z, attenuated);
-                        if (posZsun + 1 < attenuated && z == maxIndex) posZ.SetSunLight(x, y, 0, attenuated);
-                        else if (negZsun + 1 < attenuated && z == 0) negZ.SetSunLight(x, y, maxIndex, attenuated);
+                        if (posXsun + 1 < attenuated && x == startX + maxIndex) store.SetSunlight(x + 1, y, z, attenuated);
+                        else if (negXsun + 1 < attenuated && x == startX) store.SetSunlight(x - 1, y, z, attenuated);
+                        if (posZsun + 1 < attenuated && z == startZ + maxIndex) store.SetSunlight(x, y, z + 1, attenuated);
+                        else if (negZsun + 1 < attenuated && z == startZ) store.SetSunlight(x, y, z - 1, attenuated);
                     }
                 }
             }
 
             Lit = true;
         }
-        public void BuildVertices(CubeVertex[] buffer, GraphicsDevice graphics, Chunk posX, Chunk negX, Chunk posZ, Chunk negZ)
+        public void BuildVertices(CubeVertex[] buffer, GraphicsDevice graphics, CubeStorage store)
         {
             ChunkSubMesh currentMesh;
             int i = 0;
             while(i < HEIGHT)
             {
                 currentMesh = new ChunkSubMesh(i, ref Position);
-                currentMesh.BuildVertices(buffer, graphics, _cubes, posX, negX, posZ, negZ);
+                currentMesh.BuildVertices(buffer, graphics, this, store);
                 if (!currentMesh.Empty) Meshes.Add(currentMesh);
                 i += Chunk.WIDTH;
             }
@@ -222,7 +177,7 @@ namespace CubeEngine.Basic
         public override string ToString()
         {
             StringBuilder builder = new StringBuilder();
-            builder.AppendLine(Coords.ToString() + "{" + XIndex + "," + ZIndex + "}");
+            builder.AppendLine(Coords.ToString());
             builder.AppendLine("loF: " + LoadDependenciesFlag.ToString() +"|liF: " + LightDependenciesFlag.ToString() + "|buF: " + BuildDependenciesFlag.ToString());
             builder.AppendLine("load: " + Loaded.ToString() + "|lit: " + Lit.ToString() + "|empty: " + Empty.ToString() + "|changed: " + ChangedSinceLoad.ToString());
             return builder.ToString();

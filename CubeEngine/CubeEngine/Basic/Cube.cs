@@ -61,22 +61,30 @@ namespace CubeEngine.Basic
             this.Other = other;
         }
 
-        public int Attenuation()
+        public int Opacity
         {
-            return AlphaSpecular & 15;
+            get
+            {
+                return AlphaSpecular & 15;
+            }
         }
 
-        public bool IsTransparent()
+        public bool IsTransparent
         {
-            if ((AlphaSpecular & 15) != 15) return true;
-            else return false;
+            get
+            {
+                if ((AlphaSpecular & 15) != 15) return true;
+                else return false;
+            }
         }
 
-        public bool IsRenderable()
+        public bool IsRenderable
         {
-            if ((AlphaSpecular & 15) != 0) return true;
-
-            return false;
+            get
+            {
+                if ((AlphaSpecular & 15) != 0) return true;
+                return false;
+            }
         }
 
         public int SunLight { get { return LightLevels & 15; } set { LightLevels = (byte)((value & 15) | (LightLevels & 240)); } }

@@ -14,6 +14,7 @@ using CubeEngine.Basic;
 using XerUtilities.Debugging;
 using XerUtilities.Input;
 using XerUtilities.Rendering;
+using System.Diagnostics;
 
 namespace CubeEngine
 {
@@ -29,6 +30,7 @@ namespace CubeEngine
         DeltaFreeCamera camera;
         Effect effect;
         RasterizerState currentRaster;
+        Stopwatch watch;
 
         public CubeEngineGame()
         {
@@ -47,6 +49,7 @@ namespace CubeEngine
         {
             input = new XerInput(this);            
             camera = new DeltaFreeCamera(input, GraphicsDevice);
+            watch = new Stopwatch();
             base.Initialize();
         }
 
@@ -116,6 +119,8 @@ namespace CubeEngine
         /// <param name="gameTime">Provides a snapshot of timing values.</param>
         protected override void Draw(GameTime gameTime)
         {
+            watch.Reset();
+            watch.Start();
             GraphicsDevice.RasterizerState = currentRaster;
             GraphicsDevice.DepthStencilState = DepthStencilState.Default;
 
@@ -143,7 +148,7 @@ namespace CubeEngine
                     mesh = chunk.Meshes[j];
                     mesh.Update(chunk.Position);
                     mesh.GetBoundingBox(out bound);
-                    //BoundingBoxRenderer.Render(bound,GraphicsDevice,camera.View,camera.Projection, Color.Blue);
+                    BoundingBoxRenderer.Render(bound,GraphicsDevice,camera.View,camera.Projection, Color.Blue);
                     TotalSubMeshes += 1;
                     if (camera.ViewFrustum.Contains(bound) != ContainmentType.Disjoint)
                     {
@@ -160,12 +165,12 @@ namespace CubeEngine
 
                             VerticesDrawn += mesh.VertexBuffer.VertexCount;
                             SidesDrawn += mesh.SidesRenderable;
-                            CubesDrawn += mesh.SolidBlocks;
+                            CubesDrawn += mesh.RenderableBlocks;
                         }
                     }
                 }
             }
-            
+            watch.Stop();
 
 
             debug.DebugDisplay.AddLine(1,"vertices: " + (VerticesDrawn*.00001f).ToString() + "*10^6");
@@ -182,6 +187,7 @@ namespace CubeEngine
             debug.DebugDisplay.AddLine(12, "rebuild: " + chunkManager.RebuildTime.ToString() + " ms");
             debug.DebugDisplay.AddLine(13, "update: " + chunkManager.UpdateTime.ToString() + " ms");
             debug.DebugDisplay.AddLine(14, "unload: " + chunkManager.UnloadTime.ToString() + " ms");
+            debug.DebugDisplay.AddLine(15, "draw: " + watch.Elapsed.TotalMilliseconds.ToString() + " ms");
             // TODO: Add your drawing code here
 
             base.Draw(gameTime);

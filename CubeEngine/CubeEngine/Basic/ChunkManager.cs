@@ -3,15 +3,18 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using System.Diagnostics;
+
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework;
+
 using CubeEngine.Rendering;
+using CubeEngine.Utilities.Noise;
 
 namespace CubeEngine.Basic
 {
     using log = XerUtilities.Debugging.Logger;
-    using System.Diagnostics;
-    using CubeEngine.Utilities.Noise;
+
     /// <summary>
     /// Chunk Manager general flow
     /// 1. ASYNC Check if any chunks need to be loaded (from disk or into memory)
@@ -36,8 +39,9 @@ namespace CubeEngine.Basic
         public const float TIME_BETWEEN_LOADS = .5f;
         public const float TIME_BETWEEN_LIGHTS = .5f;
         public const float TIME_BETWEEN_BUILDS = .5f;
-        public const int CHUNK_BUILD_DIST = 7;
-        public const int CHUNK_LOAD_DIST = CHUNK_BUILD_DIST + 2;
+        public const int CHUNK_BUILD_DIST = 4;
+        public const int CHUNK_LIGHT_DIST = CHUNK_BUILD_DIST + 2;
+        public const int CHUNK_LOAD_DIST = CHUNK_LIGHT_DIST + 2;
         public const int INITIAL_VERTEX_ARRAY_SIZE = 1;
         public const int MAX_LIGHTING_CACHE = CHUNK_BUILD_DIST * CHUNK_BUILD_DIST * 4;
 
@@ -77,6 +81,7 @@ namespace CubeEngine.Basic
         private volatile bool lightDone;
         //private ManualResetEvent cullDone;
 
+        public CubeStorage CubeStorage;
         private ChunkStorage _chunkStorage;
         private Queue<Chunk> _loadQueue;
         public Queue<Chunk> LightQueue;
@@ -108,9 +113,13 @@ namespace CubeEngine.Basic
             _awaitingLightSortNeeded = false;
             _awaitingBuildSortNeeded = false;
 
-            _chunkStorage = new ChunkStorage(CHUNK_LOAD_DIST + 1);
+            int width = 1;
+            while (width < 2*CHUNK_LOAD_DIST) width *= 2;
+            width *= Chunk.WIDTH;
+            CubeStorage = new CubeStorage(width, Chunk.HEIGHT, width);
+            _chunkStorage = new ChunkStorage(CHUNK_LOAD_DIST);
             _loadQueue = new Queue<Chunk>();
-            _vertexBuffer = new CubeVertex[INITIAL_VERTEX_ARRAY_SIZE];
+            _vertexBuffer = new CubeVertex[1000];
 
             LightQueue = new Queue<Chunk>();
             BuildQueue = new Queue<Chunk>();
@@ -169,49 +178,6 @@ namespace CubeEngine.Basic
                 QueueTime = (float)watch2.Elapsed.TotalMilliseconds;
             }
 
-            //Load chunks from memory or build chunks use generation algorithms
-            if (!UseThreading)
-            {
-                _timeSinceLoad += dt;
-                if (_timeSinceLoad > TIME_BETWEEN_LOADS)
-                {
-                    _timeSinceLoad -= TIME_BETWEEN_LOADS;
-
-                    watch2.Reset();
-                    watch2.Start();
-                    LoadChunks(null);
-                    watch2.Stop();
-                    LoadTime = (float)watch2.Elapsed.TotalMilliseconds;
-                }
-
-                //Light chunks using "global" lighting techniques
-                _timeSinceLight += dt;
-                if (_timeSinceLight > TIME_BETWEEN_LIGHTS)
-                {
-                    _timeSinceLight -= TIME_BETWEEN_LIGHTS;
-
-                    watch2.Reset();
-                    watch2.Start();
-                    LightChunks(null);
-                    watch2.Stop();
-                    LightTime = (float)watch2.Elapsed.TotalMilliseconds;
-                }
-
-                //Build chunk vertices from the gathered data
-                _timeSinceBuild += dt;
-                if (_timeSinceBuild > TIME_BETWEEN_BUILDS)
-                {
-                    _timeSinceBuild -= TIME_BETWEEN_BUILDS;
-
-                    watch2.Reset();
-                    watch2.Start();
-                    BuildChunkVertices(null);
-                    watch2.Stop();
-                    BuildTime = (float)watch2.Elapsed.TotalMilliseconds;
-                }
-            }
-
-
             //Rebuild chunk vertices, always done sequentially to ensure that changes are immediately noticed by player.
             watch2.Reset();
             watch2.Start();
@@ -220,19 +186,11 @@ namespace CubeEngine.Basic
             RebuildTime = (float)watch2.Elapsed.TotalMilliseconds;
 
             //Unload chunks by transferring them back to hard drive with changes and then release to object pool (eventually)
-            watch2.Reset();
-            watch2.Start();
-            if (UnloadQueue.Count > 0 && unloadDone && UseThreading)
+            if (UnloadQueue.Count > 0 && unloadDone)
             {
                 unloadDone = false;
                 ThreadPool.UnsafeQueueUserWorkItem(UnloadChunks,false);
             }
-            else if (!UseThreading)
-            {
-                UnloadChunks(false);
-            }
-            watch2.Stop();
-            UnloadTime = (float)watch2.Elapsed.TotalMilliseconds;
 
             //Update all chunks
             watch2.Reset();
@@ -440,75 +398,13 @@ namespace CubeEngine.Basic
 
             float[,] heightmap = new float[Chunk.WIDTH, Chunk.WIDTH];
 
-            if (UseThreading)
+            while (loadDone)
             {
-                while (loadDone)
-                {
-                    Monitor.Enter(_loadQueue);
-                    Monitor.Wait(_loadQueue, 100); while (_loadQueue.Count == 0) Monitor.Wait(_loadQueue, 100);
-                    Monitor.Exit(_loadQueue);
+                Monitor.Enter(_loadQueue);
+                Monitor.Wait(_loadQueue, 100); while (_loadQueue.Count == 0) Monitor.Wait(_loadQueue, 100);
+                Monitor.Exit(_loadQueue);
 
-                    while (_loadQueue.Count > 0)
-                    {
-                        curr = _loadQueue.Dequeue();
-                        if (curr.Unloading) continue;
-                        
-                        if (!curr.LoadFromDisk())
-                        {
-                            //Generate using terrain generation
-                            //Get the heightmap
-                            noise.FillMap2D(heightmap, curr.Coords.X, curr.Coords.Z, octaves: 5, startFrequency: .03f, startAmplitude: 20);
-                            for (int x = 0; x < Chunk.WIDTH; x++)
-                            {
-                                worldX = x + curr.Coords.X * Chunk.WIDTH;
-                                for (int z = 0; z < Chunk.WIDTH; z++)
-                                {                                    
-                                    worldZ = z + curr.Coords.Z * Chunk.WIDTH;
-
-                                    height = (int)(heightmap[x, z] + Settings.SEA_LEVEL);
-                                    
-                                    //Create ground
-                                    for (int y = 0; y < height; y++)
-                                    {
-                                        cube = new Cube(CubeType.Stone);
-                                        curr.SetCube(x, y, z, ref cube);
-                                    }
-
-                                    //Create mountains
-
-                                    for (int y = height; y < Chunk.HEIGHT; y++)
-                                    {
-                                        noisevalue = noise.GetValue3D(worldX, y, worldZ, octaves: 6, startFrequency: .05f, startAmplitude: 2);
-                                        MathHelper.Clamp(noisevalue, -1, 1);
-                                        noisevalue -= 2 * height * invHeight;
-
-                                        if (noisevalue > 0)
-                                        {
-                                            cube = new Cube(CubeType.Dirt);
-                                            curr.SetCube(x, y, z, ref cube);
-                                        }
-                                        else
-                                        {
-                                            cube = new Cube(CubeType.Air);
-                                            curr.SetCube(x, y, z, ref cube);
-                                        }
-                                    }
-
-                                }
-                            }
-                        }
-                        curr.Loaded = true;
-
-                        AwaitingLightDependenciesList.Add(curr);
-                        _awaitingLightSortNeeded = true;
-                        ChunkLoadedEvent(this, curr);
-                    }
-                }
-            }
-            else            
-            {
-                int loadedThisFrame = 0;
-                while (_loadQueue.Count > 0 && (PER_TICK_CHUNKS_LOAD - loadedThisFrame) > 0)
+                while (_loadQueue.Count > 0)
                 {
                     curr = _loadQueue.Dequeue();
                     if (curr.Unloading) continue;
@@ -516,17 +412,51 @@ namespace CubeEngine.Basic
                     if (!curr.LoadFromDisk())
                     {
                         //Generate using terrain generation
+                        //Get the heightmap
+                        noise.FillMap2D(heightmap, curr.Coords.X, curr.Coords.Z, octaves: 5, startFrequency: .03f, startAmplitude: 5);
                         for (int x = 0; x < Chunk.WIDTH; x++)
-                            for (int y = 0; y < Chunk.HEIGHT; y++)
-                                for (int z = 0; z < Chunk.WIDTH; z++)
+                        {
+                            worldX = x + curr.Coords.X * Chunk.WIDTH;
+                            for (int z = 0; z < Chunk.WIDTH; z++)
+                            {
+                                worldZ = z + curr.Coords.Z * Chunk.WIDTH;
+
+                                height = (int)(heightmap[x, z] + Settings.SEA_LEVEL);
+
+                                //Create ground
+                                for (int y = 0; y < height; y++)
                                 {
-
-
+                                    cube = new Cube(CubeType.Stone);
+                                    CubeStorage.SetCube(worldX, y, worldZ, ref cube);
                                 }
+
+                                //Create mountains
+                                for (int y = height; y < Chunk.HEIGHT; y++)
+                                {
+                                    noisevalue = noise.GetValue3D(worldX, y, worldZ, octaves: 6, startFrequency: .05f, startAmplitude: 2);
+                                    MathHelper.Clamp(noisevalue, -1, 1);
+                                    noisevalue -= 2 * height * invHeight;
+
+                                    if (noisevalue > 0.5f)
+                                    {
+                                        cube = new Cube(CubeType.Stone);
+                                        CubeStorage.SetCube(worldX, y, worldZ, ref cube);
+                                    }
+                                    else if (noisevalue > 0.0f)
+                                    {
+                                        cube = new Cube(CubeType.Dirt);
+                                        CubeStorage.SetCube(worldX, y, worldZ, ref cube);
+                                    }
+                                    else
+                                    {
+                                        cube = new Cube(CubeType.Air);
+                                        CubeStorage.SetCube(worldX, y, worldZ, ref cube);
+                                    }
+                                }
+
+                            }
+                        }
                     }
-
-                    loadedThisFrame += 1;
-
                     curr.Loaded = true;
 
                     AwaitingLightDependenciesList.Add(curr);
@@ -534,6 +464,9 @@ namespace CubeEngine.Basic
                     ChunkLoadedEvent(this, curr);
                 }
             }
+            
+
+            
         }
 
         public void LightChunks(Object threadContext)
@@ -541,53 +474,19 @@ namespace CubeEngine.Basic
             
 
             Chunk curr;
-            Chunk posX = null;
-            Chunk negX = null;
-            Chunk posZ = null;
-            Chunk negZ = null;
 
-            if (UseThreading)
+            while (lightDone)
             {
-                while (lightDone)
-                {
-                    Monitor.Enter(LightQueue);
-                    Monitor.Wait(LightQueue, 100);//while (LightQueue.Count == 0) Monitor.Wait(LightQueue, 500);
-                    Monitor.Exit(LightQueue);
+                Monitor.Enter(LightQueue);
+                Monitor.Wait(LightQueue, 100);//while (LightQueue.Count == 0) Monitor.Wait(LightQueue, 500);
+                Monitor.Exit(LightQueue);
 
-                    while (LightQueue.Count > 0)
-                    {
-                        curr = LightQueue.Dequeue();
-                        if (curr.Unloading) continue;
-
-                        negX = _chunkStorage.GetChunk(curr.Coords.X - 1, curr.Coords.Z);
-                        posX = _chunkStorage.GetChunk(curr.Coords.X + 1, curr.Coords.Z);
-                        negZ = _chunkStorage.GetChunk(curr.Coords.X, curr.Coords.Z - 1);
-                        posZ = _chunkStorage.GetChunk(curr.Coords.X, curr.Coords.Z + 1);
-
-                        curr.PropagateSun(posX, negX, posZ, negZ);
-
-                        AwaitingBuildDependenciesList.Add(curr);
-                        _awaitingBuildSortNeeded = true;
-                        ChunkLitEvent(this, curr);
-                    }
-                }
-            }
-            else
-            {
-                int chunksLitThisFrame = 0;
-                while (LightQueue.Count > 0 && PER_TICK_CHUNKS_LIGHT - chunksLitThisFrame >= 0)
+                while (LightQueue.Count > 0)
                 {
                     curr = LightQueue.Dequeue();
                     if (curr.Unloading) continue;
 
-                    negX = _chunkStorage.GetChunk(curr.Coords.X - 1, curr.Coords.Z);
-                    posX = _chunkStorage.GetChunk(curr.Coords.X + 1, curr.Coords.Z);
-                    negZ = _chunkStorage.GetChunk(curr.Coords.X, curr.Coords.Z - 1);
-                    posZ = _chunkStorage.GetChunk(curr.Coords.X, curr.Coords.Z + 1);
-
-                    curr.PropagateSun(posX, negX, posZ, negZ);
-
-                    chunksLitThisFrame += 1;
+                    curr.PropagateSun(CubeStorage);
 
                     AwaitingBuildDependenciesList.Add(curr);
                     _awaitingBuildSortNeeded = true;
@@ -599,55 +498,23 @@ namespace CubeEngine.Basic
         public void BuildChunkVertices(Object threadContext)
         { 
             Chunk curr;
-            Chunk posX = null;
-            Chunk negX = null;
-            Chunk posZ = null;
-            Chunk negZ = null;
-
-            if (UseThreading)
+            while (buildDone)
             {
-                while (buildDone)
-                {
-                    Monitor.Enter(BuildQueue);
-                    Monitor.Wait(BuildQueue, 100); //while (BuildQueue.Count == 0) Monitor.Wait(BuildQueue, 500);
-                    Monitor.Exit(BuildQueue);
+                Monitor.Enter(BuildQueue);
+                Monitor.Wait(BuildQueue, 100); //while (BuildQueue.Count == 0) Monitor.Wait(BuildQueue, 500);
+                Monitor.Exit(BuildQueue);
 
-                    while (BuildQueue.Count > 0)
-                    {
-                        curr = BuildQueue.Dequeue();
-                        if (curr.Unloading) continue;
-
-                        negX = _chunkStorage.GetChunk(curr.Coords.X - 1, curr.Coords.Z);
-                        posX = _chunkStorage.GetChunk(curr.Coords.X + 1, curr.Coords.Z);
-                        negZ = _chunkStorage.GetChunk(curr.Coords.X, curr.Coords.Z - 1);
-                        posZ = _chunkStorage.GetChunk(curr.Coords.X, curr.Coords.Z + 1);
-
-                        curr.BuildVertices(_vertexBuffer, m_graphics, posX, negX, posZ, negZ);
-
-                        if (curr.Meshes.Count > 0 && !DrawList.Contains(curr)) DrawList.Add(curr);
-                    }
-                }
-            }
-            else
-            {
-                int chunksBuiltThisFrame = 0;
-                while (BuildQueue.Count > 0 && PER_TICK_CHUNKS_BUILD - chunksBuiltThisFrame >= 0)
+                while (BuildQueue.Count > 0)
                 {
                     curr = BuildQueue.Dequeue();
                     if (curr.Unloading) continue;
 
-                    negX = _chunkStorage.GetChunk(curr.Coords.X - 1, curr.Coords.Z);
-                    posX = _chunkStorage.GetChunk(curr.Coords.X + 1, curr.Coords.Z);
-                    negZ = _chunkStorage.GetChunk(curr.Coords.X, curr.Coords.Z - 1);
-                    posZ = _chunkStorage.GetChunk(curr.Coords.X, curr.Coords.Z + 1);
-
-                    curr.BuildVertices(_vertexBuffer, m_graphics, posX, negX, posZ, negZ);
+                    curr.BuildVertices(_vertexBuffer, m_graphics, CubeStorage);
 
                     if (curr.Meshes.Count > 0 && !DrawList.Contains(curr)) DrawList.Add(curr);
-
-                    chunksBuiltThisFrame += 1;
                 }
             }
+
         }
 
 

@@ -36,9 +36,6 @@ namespace CubeEngine.Basic
                 manager.PrepareChunkForUnload(Chunks[x, z]);
             }
 
-            chunk.XIndex = x;
-            chunk.ZIndex = z;
-
             Chunks[x, z] = chunk;
 
             LoadedChunks.Add(chunk);

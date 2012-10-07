@@ -33,7 +33,7 @@ namespace CubeEngine.Rendering
             new VertexElement(32, VertexElementFormat.Short2, VertexElementUsage.Color, 2)
             );
 
-        public CubeVertex(ref Vector3 position, ref NormalizedByte4 normal, ref Vector2 texture, ref Cube cube, ref Cube neighbor)
+        public CubeVertex(ref Vector3 position, ref NormalizedByte4 normal, ref Vector2 texture, ref Cube cube, ref Cube n1, ref Cube n2, ref Cube n3, ref Cube n4)
         {
             this.VertexPosition = position;
             this.Normal = normal;
@@ -43,11 +43,11 @@ namespace CubeEngine.Rendering
             this.Blue = cube.Blue;
             this.Alpha = (byte)cube.Alpha;
             this.Luminance = (byte)cube.Specular;
-            this.LocalRed = neighbor.LocalRed;
-            this.LocalGreen = neighbor.LocalGreen;
-            this.LocalBlue = neighbor.LocalBlue;
-            this.LocalLight = (byte)neighbor.LocalLight;
-            this.SkyLight = (byte)neighbor.SunLight;
+            this.LocalRed = (byte)((n1.LocalRed + n2.LocalRed + n3.LocalRed + n4.LocalRed) * 0.25f);
+            this.LocalGreen = (byte)((n1.LocalGreen + n2.LocalGreen + n3.LocalGreen + n4.LocalGreen) * 0.25f);
+            this.LocalBlue = (byte)((n1.LocalBlue + n2.LocalBlue + n3.LocalBlue + n4.LocalBlue) * 0.25f);
+            this.LocalLight = (byte)((n1.LocalLight + n2.LocalLight + n3.LocalLight + n4.LocalLight) * 0.25f);
+            this.SkyLight = (byte)((n1.SunLight + n2.SunLight + n3.SunLight + n4.SunLight) * 0.25f);
 
 
             //this.Texture = new Byte4(texture.X, texture.Y, neighbor.SunLight, cube.Specular);

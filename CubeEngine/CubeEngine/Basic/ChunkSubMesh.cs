@@ -9,7 +9,9 @@ using CubeEngine.Rendering;
 
 
 namespace CubeEngine.Basic
-{    
+{
+    using log = XerUtilities.Debugging.Logger;
+
     public class ChunkSubMesh
     {
         
@@ -20,7 +22,7 @@ namespace CubeEngine.Basic
         public Vector3 Position;
 
         //Statisitics
-        public int SolidBlocks;
+        public int RenderableBlocks;
         public int SidesRenderable;
 
         //Render Members
@@ -43,210 +45,287 @@ namespace CubeEngine.Basic
         public void GetBoundingBox(out BoundingBox boundingBox)
         {
             boundingBox.Min = Position;  
-            boundingBox.Max = boundingBox.Min + new Vector3(Chunk.WIDTH, Chunk.WIDTH, Chunk.WIDTH);
-                      
+            boundingBox.Max = boundingBox.Min + new Vector3(Chunk.WIDTH, Chunk.WIDTH, Chunk.WIDTH);                      
         }
 
         public void Update(Vector3 chunkPosition)
         {
             Vector3.Add(ref chunkPosition, ref Offset, out Position);
         }
-        public void BuildVertices(CubeVertex[] vertexBuffer, GraphicsDevice graphics, Cube[,,] parentCubes, Chunk posX, Chunk negX, Chunk posZ, Chunk negZ)
+
+        public void BuildVertices(CubeVertex[] vertexBuffer, GraphicsDevice graphics, Chunk parent, CubeStorage store)
         {
-            if (SideCountNeeded) Initialize(parentCubes, posX, negX, posZ, negZ);
-            if (vertexBuffer.Length < SidesRenderable * 6f) vertexBuffer = new CubeVertex[(int)(SidesRenderable * 6.25f)];
+            if (SideCountNeeded) CollectSubmeshStats(parent, store);
+            if (vertexBuffer.Length < SidesRenderable * 6f) vertexBuffer = new CubeVertex[(int)(SidesRenderable * 6.1f)];
             
             Cube current;
-            Cube neighbor;
+            Cube n0;
+            Cube n1;
+            Cube n2;
+            Cube n3;
+            Cube n4;
+            Cube n5;
+            Cube n6;
+            Cube n7;
+            Cube n8;
 
-            int i = 0;
             Vector3 offset;
-            Vector3 pos1;
-            Vector3 pos2;
-            Vector3 pos3;
-            Vector3 pos4;
-            Vector3 pos5;
-            Vector3 pos6;
-            Vector3 pos7;
-            Vector3 pos8;            
+            Vector3 posNNN;
+            Vector3 posNNP;
+            Vector3 posNPN;
+            Vector3 posNPP;
+            Vector3 posPNN;
+            Vector3 posPNP;
+            Vector3 posPPN;
+            Vector3 posPPP;
 
-            int maxIndex = Chunk.WIDTH - 1;
+            int ind = 0;
+            int worldX = 0;
+            int worldZ = 0;
+            int reg=0;
+
+            int vert1light = 0;
+            int vert2light = 0;
+            int vert3light = 0;
+            int vert4light = 0;
+
+            int maxY = Chunk.HEIGHT - 1;
+
             for (int x = 0; x < Chunk.WIDTH; x++)
-                for (int y = _yStartIndex; y <= _yEndIndex; y++)
-                    for (int z = 0; z < Chunk.WIDTH; z++)
+            {
+                worldX = x + parent.Coords.X * Chunk.WIDTH;
+                for (int z = 0; z < Chunk.WIDTH; z++)
+                {
+                    worldZ = z + parent.Coords.Z * Chunk.WIDTH;
+                    for (int y = _yStartIndex; y <= _yEndIndex; y++)
                     {
-                        current = parentCubes[x, y, z];
-                        if (!current.IsRenderable()) continue;
+                        store.GetCube(worldX, y, worldZ, out current);
 
-                        SolidBlocks += 1;
+                        //log.Write("worldCoords", "{" + worldX.ToString() + "," + y.ToString() + "," + worldZ.ToString() + "}", "");
+
+                        if (!current.IsRenderable) continue;
 
                         offset.X = x;
                         offset.Y = y - _yStartIndex;
                         offset.Z = z;
 
-                        Vector3.Add(ref CubeVertex.CORNER_NNN, ref offset, out pos1);
-                        Vector3.Add(ref CubeVertex.CORNER_NNP, ref offset, out pos2);
-                        Vector3.Add(ref CubeVertex.CORNER_NPN, ref offset, out pos3);
-                        Vector3.Add(ref CubeVertex.CORNER_NPP, ref offset, out pos4);
-                        Vector3.Add(ref CubeVertex.CORNER_PNN, ref offset, out pos5);
-                        Vector3.Add(ref CubeVertex.CORNER_PNP, ref offset, out pos6);
-                        Vector3.Add(ref CubeVertex.CORNER_PPN, ref offset, out pos7);
-                        Vector3.Add(ref CubeVertex.CORNER_PPP, ref offset, out pos8);
+                        Vector3.Add(ref CubeVertex.CORNER_NNN, ref offset, out posNNN);
+                        Vector3.Add(ref CubeVertex.CORNER_NNP, ref offset, out posNNP);
+                        Vector3.Add(ref CubeVertex.CORNER_NPN, ref offset, out posNPN);
+                        Vector3.Add(ref CubeVertex.CORNER_NPP, ref offset, out posNPP);
+                        Vector3.Add(ref CubeVertex.CORNER_PNN, ref offset, out posPNN);
+                        Vector3.Add(ref CubeVertex.CORNER_PNP, ref offset, out posPNP);
+                        Vector3.Add(ref CubeVertex.CORNER_PPN, ref offset, out posPPN);
+                        Vector3.Add(ref CubeVertex.CORNER_PPP, ref offset, out posPPP);
 
                         //-x
-                        if (x == 0) neighbor = negX.GetCube(maxIndex, y, z);
-                        else neighbor = parentCubes[x - 1, y, z];
+                        reg = worldX - 1;
+                        store.GetCube(reg, y, worldZ, out n0);
 
-                        if (neighbor.IsTransparent())
+                        if (n0.IsTransparent)
                         {
-                            vertexBuffer[i++] = new CubeVertex(ref pos3, ref CubeVertex.N_NEG_X, ref CubeVertex.TC00, ref current, ref neighbor);
-                            vertexBuffer[i++] = new CubeVertex(ref pos4, ref CubeVertex.N_NEG_X, ref CubeVertex.TC10, ref current, ref neighbor);
-                            vertexBuffer[i++] = new CubeVertex(ref pos1, ref CubeVertex.N_NEG_X, ref CubeVertex.TC01, ref current, ref neighbor);
-                            vertexBuffer[i++] = new CubeVertex(ref pos1, ref CubeVertex.N_NEG_X, ref CubeVertex.TC01, ref current, ref neighbor);
-                            vertexBuffer[i++] = new CubeVertex(ref pos4, ref CubeVertex.N_NEG_X, ref CubeVertex.TC10, ref current, ref neighbor);
-                            vertexBuffer[i++] = new CubeVertex(ref pos2, ref CubeVertex.N_NEG_X, ref CubeVertex.TC11, ref current, ref neighbor);                       
+                            store.SafeGetCube(reg, y + 1, worldZ, out n1);
+                            store.SafeGetCube(reg, y + 1, worldZ + 1, out n2);
+                            store.GetCube(reg, y, worldZ + 1, out n3);
+                            store.SafeGetCube(reg, y - 1, worldZ + 1, out n4);
+                            store.SafeGetCube(reg, y - 1, worldZ, out n5);
+                            store.SafeGetCube(reg, y - 1, worldZ - 1, out n6);
+                            store.GetCube(reg, y, worldZ - 1, out n7);
+                            store.SafeGetCube(reg, y + 1, worldZ - 1, out n8);
+
+                            vertexBuffer[ind++] = new CubeVertex(ref posNPN, ref CubeVertex.N_NEG_X, ref CubeVertex.TC00, ref current, ref n0, ref n1, ref n7, ref n8);
+                            vertexBuffer[ind++] = new CubeVertex(ref posNPP, ref CubeVertex.N_NEG_X, ref CubeVertex.TC10, ref current, ref n0, ref n1, ref n2, ref n3);
+                            vertexBuffer[ind++] = new CubeVertex(ref posNNN, ref CubeVertex.N_NEG_X, ref CubeVertex.TC01, ref current, ref n0, ref n5, ref n6, ref n7);
+                            vertexBuffer[ind++] = new CubeVertex(ref posNNN, ref CubeVertex.N_NEG_X, ref CubeVertex.TC01, ref current, ref n0, ref n5, ref n6, ref n7);
+                            vertexBuffer[ind++] = new CubeVertex(ref posNPP, ref CubeVertex.N_NEG_X, ref CubeVertex.TC10, ref current, ref n0, ref n1, ref n2, ref n3);
+                            vertexBuffer[ind++] = new CubeVertex(ref posNNP, ref CubeVertex.N_NEG_X, ref CubeVertex.TC11, ref current, ref n0, ref n3, ref n4, ref n5);
                         }
 
                         //+x
-                        if (x == maxIndex) neighbor = posX.GetCube(0, y, z);
-                        else neighbor = parentCubes[x + 1, y, z];
+                        reg = worldX + 1;
+                        store.GetCube(reg, y, worldZ, out n0);
 
-                        if (neighbor.IsTransparent())
+                        if (n0.IsTransparent)
                         {
-                            vertexBuffer[i++] = new CubeVertex(ref pos8, ref CubeVertex.N_POS_X, ref CubeVertex.TC00, ref current, ref neighbor);
-                            vertexBuffer[i++] = new CubeVertex(ref pos7, ref CubeVertex.N_POS_X, ref CubeVertex.TC10, ref current, ref neighbor);
-                            vertexBuffer[i++] = new CubeVertex(ref pos6, ref CubeVertex.N_POS_X, ref CubeVertex.TC01, ref current, ref neighbor);
-                            vertexBuffer[i++] = new CubeVertex(ref pos6, ref CubeVertex.N_POS_X, ref CubeVertex.TC01, ref current, ref neighbor);
-                            vertexBuffer[i++] = new CubeVertex(ref pos7, ref CubeVertex.N_POS_X, ref CubeVertex.TC10, ref current, ref neighbor);
-                            vertexBuffer[i++] = new CubeVertex(ref pos5, ref CubeVertex.N_POS_X, ref CubeVertex.TC11, ref current, ref neighbor);                        
+                            store.SafeGetCube(reg, y + 1, worldZ, out n1);
+                            store.SafeGetCube(reg, y + 1, worldZ + 1, out n2);
+                            store.GetCube(reg, y, worldZ + 1, out n3);
+                            store.SafeGetCube(reg, y - 1, worldZ + 1, out n4);
+                            store.SafeGetCube(reg, y - 1, worldZ, out n5);
+                            store.SafeGetCube(reg, y - 1, worldZ - 1, out n6);
+                            store.GetCube(reg, y, worldZ - 1, out n7);
+                            store.SafeGetCube(reg, y + 1, worldZ - 1, out n8);
+
+                            vertexBuffer[ind++] = new CubeVertex(ref posPPP, ref CubeVertex.N_POS_X, ref CubeVertex.TC00, ref current, ref n0, ref n1, ref n2, ref n3);
+                            vertexBuffer[ind++] = new CubeVertex(ref posPPN, ref CubeVertex.N_POS_X, ref CubeVertex.TC10, ref current, ref n0, ref n1, ref n7, ref n8);
+                            vertexBuffer[ind++] = new CubeVertex(ref posPNP, ref CubeVertex.N_POS_X, ref CubeVertex.TC01, ref current, ref n0, ref n3, ref n4, ref n5);
+                            vertexBuffer[ind++] = new CubeVertex(ref posPNP, ref CubeVertex.N_POS_X, ref CubeVertex.TC01, ref current, ref n0, ref n3, ref n4, ref n5);
+                            vertexBuffer[ind++] = new CubeVertex(ref posPPN, ref CubeVertex.N_POS_X, ref CubeVertex.TC10, ref current, ref n0, ref n1, ref n7, ref n8);
+                            vertexBuffer[ind++] = new CubeVertex(ref posPNN, ref CubeVertex.N_POS_X, ref CubeVertex.TC11, ref current, ref n0, ref n5, ref n6, ref n7);
                         }
 
                         //-y
-                        if (y == _yStartIndex) neighbor = (_yStartIndex != 0) ? parentCubes[x, y - 1, z] : Cube.NULL;
-                        else neighbor = parentCubes[x, y - 1, z];
+                        reg = y - 1;
+                        if (y != 0) store.GetCube(worldX, reg, worldZ, out n0);
+                        else n0 = Cube.NULL;
 
-                        if (neighbor.IsTransparent() && neighbor.Type != CubeType.NULL)
+                        if (n0.IsTransparent && n0.Type != CubeType.NULL)
                         {
-                            vertexBuffer[i++] = new CubeVertex(ref pos2, ref CubeVertex.N_NEG_Y, ref CubeVertex.TC00, ref current, ref neighbor);
-                            vertexBuffer[i++] = new CubeVertex(ref pos6, ref CubeVertex.N_NEG_Y, ref CubeVertex.TC10, ref current, ref neighbor);
-                            vertexBuffer[i++] = new CubeVertex(ref pos1, ref CubeVertex.N_NEG_Y, ref CubeVertex.TC01, ref current, ref neighbor);
-                            vertexBuffer[i++] = new CubeVertex(ref pos1, ref CubeVertex.N_NEG_Y, ref CubeVertex.TC01, ref current, ref neighbor);
-                            vertexBuffer[i++] = new CubeVertex(ref pos6, ref CubeVertex.N_NEG_Y, ref CubeVertex.TC10, ref current, ref neighbor);
-                            vertexBuffer[i++] = new CubeVertex(ref pos5, ref CubeVertex.N_NEG_Y, ref CubeVertex.TC11, ref current, ref neighbor);
+                            store.GetCube(worldX + 1, reg, worldZ, out n1);
+                            store.GetCube(worldX + 1, reg, worldZ + 1, out n2);
+                            store.GetCube(worldX, reg, worldZ + 1, out n3);
+                            store.GetCube(worldX - 1, reg, worldZ + 1, out n4);
+                            store.GetCube(worldX - 1, reg, worldZ, out n5);
+                            store.GetCube(worldX - 1, reg, worldZ - 1, out n6);
+                            store.GetCube(worldX, reg, worldZ - 1, out n7);
+                            store.GetCube(worldX + 1, reg, worldZ - 1, out n8);
+
+                            vertexBuffer[ind++] = new CubeVertex(ref posNNP, ref CubeVertex.N_NEG_Y, ref CubeVertex.TC00, ref current, ref n0, ref n3, ref n4, ref n5);
+                            vertexBuffer[ind++] = new CubeVertex(ref posPNP, ref CubeVertex.N_NEG_Y, ref CubeVertex.TC10, ref current, ref n0, ref n1, ref n2, ref n3);
+                            vertexBuffer[ind++] = new CubeVertex(ref posNNN, ref CubeVertex.N_NEG_Y, ref CubeVertex.TC01, ref current, ref n0, ref n5, ref n6, ref n7);
+                            vertexBuffer[ind++] = new CubeVertex(ref posNNN, ref CubeVertex.N_NEG_Y, ref CubeVertex.TC01, ref current, ref n0, ref n5, ref n6, ref n7);
+                            vertexBuffer[ind++] = new CubeVertex(ref posPNP, ref CubeVertex.N_NEG_Y, ref CubeVertex.TC10, ref current, ref n0, ref n1, ref n2, ref n3);
+                            vertexBuffer[ind++] = new CubeVertex(ref posPNN, ref CubeVertex.N_NEG_Y, ref CubeVertex.TC11, ref current, ref n0, ref n1, ref n7, ref n8);
                         }
 
                         //+y
-                        if (y == _yEndIndex) neighbor = (_yEndIndex != Chunk.HEIGHT-1) ? parentCubes[x, y + 1, z] : Cube.NULL;
-                        else neighbor = parentCubes[x, y + 1, z];
+                        reg = y + 1;
+                        if (y != maxY) store.GetCube(worldX, reg, worldZ, out n0);
+                        else n0 = Cube.NULL;
 
-                        if (neighbor.IsTransparent() && neighbor.Type != CubeType.NULL)
+                        if (n0.IsTransparent && n0.Type != CubeType.NULL)
                         {
-                            vertexBuffer[i++] = new CubeVertex(ref pos3, ref CubeVertex.N_POS_Y, ref CubeVertex.TC00, ref current, ref neighbor);
-                            vertexBuffer[i++] = new CubeVertex(ref pos7, ref CubeVertex.N_POS_Y, ref CubeVertex.TC10, ref current, ref neighbor);
-                            vertexBuffer[i++] = new CubeVertex(ref pos4, ref CubeVertex.N_POS_Y, ref CubeVertex.TC01, ref current, ref neighbor);
-                            vertexBuffer[i++] = new CubeVertex(ref pos4, ref CubeVertex.N_POS_Y, ref CubeVertex.TC01, ref current, ref neighbor);
-                            vertexBuffer[i++] = new CubeVertex(ref pos7, ref CubeVertex.N_POS_Y, ref CubeVertex.TC10, ref current, ref neighbor);
-                            vertexBuffer[i++] = new CubeVertex(ref pos8, ref CubeVertex.N_POS_Y, ref CubeVertex.TC11, ref current, ref neighbor);
+                            store.GetCube(worldX + 1, reg, worldZ, out n1);
+                            store.GetCube(worldX + 1, reg, worldZ + 1, out n2);
+                            store.GetCube(worldX, reg, worldZ + 1, out n3);
+                            store.GetCube(worldX - 1, reg, worldZ + 1, out n4);
+                            store.GetCube(worldX - 1, reg, worldZ, out n5);
+                            store.GetCube(worldX - 1, reg, worldZ - 1, out n6);
+                            store.GetCube(worldX, reg, worldZ - 1, out n7);
+                            store.GetCube(worldX + 1, reg, worldZ - 1, out n8);
+
+                            vertexBuffer[ind++] = new CubeVertex(ref posNPN, ref CubeVertex.N_POS_Y, ref CubeVertex.TC00, ref current, ref n0, ref n5, ref n6, ref n7);
+                            vertexBuffer[ind++] = new CubeVertex(ref posPPN, ref CubeVertex.N_POS_Y, ref CubeVertex.TC10, ref current, ref n0, ref n1, ref n7, ref n8);
+                            vertexBuffer[ind++] = new CubeVertex(ref posNPP, ref CubeVertex.N_POS_Y, ref CubeVertex.TC01, ref current, ref n0, ref n3, ref n4, ref n5);
+                            vertexBuffer[ind++] = new CubeVertex(ref posNPP, ref CubeVertex.N_POS_Y, ref CubeVertex.TC01, ref current, ref n0, ref n3, ref n4, ref n5);
+                            vertexBuffer[ind++] = new CubeVertex(ref posPPN, ref CubeVertex.N_POS_Y, ref CubeVertex.TC10, ref current, ref n0, ref n1, ref n7, ref n8);
+                            vertexBuffer[ind++] = new CubeVertex(ref posPPP, ref CubeVertex.N_POS_Y, ref CubeVertex.TC11, ref current, ref n0, ref n1, ref n2, ref n3);
                         }
 
                         //-z
-                        if (z == 0) neighbor = negZ.GetCube(x, y, maxIndex);
-                        else neighbor = parentCubes[x, y, z - 1];
+                        reg = worldZ - 1;
+                        store.GetCube(worldX, y, reg, out n0);
 
-                        if (neighbor.IsTransparent())
+                        if (n0.IsTransparent)
                         {
-                            vertexBuffer[i++] = new CubeVertex(ref pos7, ref CubeVertex.N_NEG_Z, ref CubeVertex.TC00, ref current, ref neighbor);
-                            vertexBuffer[i++] = new CubeVertex(ref pos3, ref CubeVertex.N_NEG_Z, ref CubeVertex.TC10, ref current, ref neighbor);
-                            vertexBuffer[i++] = new CubeVertex(ref pos5, ref CubeVertex.N_NEG_Z, ref CubeVertex.TC01, ref current, ref neighbor);
-                            vertexBuffer[i++] = new CubeVertex(ref pos5, ref CubeVertex.N_NEG_Z, ref CubeVertex.TC01, ref current, ref neighbor);
-                            vertexBuffer[i++] = new CubeVertex(ref pos3, ref CubeVertex.N_NEG_Z, ref CubeVertex.TC10, ref current, ref neighbor);
-                            vertexBuffer[i++] = new CubeVertex(ref pos1, ref CubeVertex.N_NEG_Z, ref CubeVertex.TC11, ref current, ref neighbor);                      
+                            store.GetCube(worldX + 1, y, reg, out n1);
+                            store.SafeGetCube(worldX + 1, y + 1, reg, out n2);
+                            store.SafeGetCube(worldX, y + 1, reg, out n3);
+                            store.SafeGetCube(worldX - 1, y + 1, reg, out n4);
+                            store.GetCube(worldX - 1, y, reg, out n5);
+                            store.SafeGetCube(worldX - 1, y - 1, reg, out n6);
+                            store.SafeGetCube(worldX, y - 1, reg, out n7);
+                            store.SafeGetCube(worldX + 1, y - 1, reg, out n8);
+
+                            vertexBuffer[ind++] = new CubeVertex(ref posPPN, ref CubeVertex.N_NEG_Z, ref CubeVertex.TC00, ref current, ref n0, ref n1, ref n2, ref n3);
+                            vertexBuffer[ind++] = new CubeVertex(ref posNPN, ref CubeVertex.N_NEG_Z, ref CubeVertex.TC10, ref current, ref n0, ref n3, ref n4, ref n5);
+                            vertexBuffer[ind++] = new CubeVertex(ref posPNN, ref CubeVertex.N_NEG_Z, ref CubeVertex.TC01, ref current, ref n0, ref n1, ref n7, ref n8);
+                            vertexBuffer[ind++] = new CubeVertex(ref posPNN, ref CubeVertex.N_NEG_Z, ref CubeVertex.TC01, ref current, ref n0, ref n1, ref n7, ref n8);
+                            vertexBuffer[ind++] = new CubeVertex(ref posNPN, ref CubeVertex.N_NEG_Z, ref CubeVertex.TC10, ref current, ref n0, ref n3, ref n4, ref n5);
+                            vertexBuffer[ind++] = new CubeVertex(ref posNNN, ref CubeVertex.N_NEG_Z, ref CubeVertex.TC11, ref current, ref n0, ref n5, ref n6, ref n7);
                         }
 
                         //+z
-                        if (z == maxIndex) neighbor = posZ.GetCube(x, y, 0);
-                        else neighbor = parentCubes[x, y, z + 1];
+                        reg = worldZ + 1;
+                        store.GetCube(worldX, y, reg, out n0);
 
-                        if (neighbor.IsTransparent())
+                        if (n0.IsTransparent)
                         {
-                            vertexBuffer[i++] = new CubeVertex(ref pos4, ref CubeVertex.N_POS_Z, ref CubeVertex.TC00, ref current, ref neighbor);
-                            vertexBuffer[i++] = new CubeVertex(ref pos8, ref CubeVertex.N_POS_Z, ref CubeVertex.TC10, ref current, ref neighbor);
-                            vertexBuffer[i++] = new CubeVertex(ref pos2, ref CubeVertex.N_POS_Z, ref CubeVertex.TC01, ref current, ref neighbor);
-                            vertexBuffer[i++] = new CubeVertex(ref pos2, ref CubeVertex.N_POS_Z, ref CubeVertex.TC01, ref current, ref neighbor);
-                            vertexBuffer[i++] = new CubeVertex(ref pos8, ref CubeVertex.N_POS_Z, ref CubeVertex.TC10, ref current, ref neighbor);
-                            vertexBuffer[i++] = new CubeVertex(ref pos6, ref CubeVertex.N_POS_Z, ref CubeVertex.TC11, ref current, ref neighbor);                        
+                            store.GetCube(worldX + 1, y, reg, out n1);
+                            store.SafeGetCube(worldX + 1, y + 1, reg, out n2);
+                            store.SafeGetCube(worldX, y + 1, reg, out n3);
+                            store.SafeGetCube(worldX - 1, y + 1, reg, out n4);
+                            store.GetCube(worldX - 1, y, reg, out n5);
+                            store.SafeGetCube(worldX - 1, y - 1, reg, out n6);
+                            store.SafeGetCube(worldX, y - 1, reg, out n7);
+                            store.SafeGetCube(worldX + 1, y - 1, reg, out n8);
+
+                            vertexBuffer[ind++] = new CubeVertex(ref posNPP, ref CubeVertex.N_POS_Z, ref CubeVertex.TC00, ref current, ref n0, ref n3, ref n4, ref n5);
+                            vertexBuffer[ind++] = new CubeVertex(ref posPPP, ref CubeVertex.N_POS_Z, ref CubeVertex.TC10, ref current, ref n0, ref n1, ref n2, ref n3);
+                            vertexBuffer[ind++] = new CubeVertex(ref posNNP, ref CubeVertex.N_POS_Z, ref CubeVertex.TC01, ref current, ref n0, ref n5, ref n6, ref n7);
+                            vertexBuffer[ind++] = new CubeVertex(ref posNNP, ref CubeVertex.N_POS_Z, ref CubeVertex.TC01, ref current, ref n0, ref n5, ref n6, ref n7);
+                            vertexBuffer[ind++] = new CubeVertex(ref posPPP, ref CubeVertex.N_POS_Z, ref CubeVertex.TC10, ref current, ref n0, ref n1, ref n2, ref n3);
+                            vertexBuffer[ind++] = new CubeVertex(ref posPNP, ref CubeVertex.N_POS_Z, ref CubeVertex.TC11, ref current, ref n0, ref n1, ref n7, ref n8);
                         }
                     }
+                }
+            }
 
-            if (i > 0)
+            if (ind > 0)
             {
-                VertexBuffer = new VertexBuffer(graphics, typeof(CubeVertex), vertexBuffer.Length, BufferUsage.None);
-                VertexBuffer.SetData<CubeVertex>(vertexBuffer,0,i);
+                VertexBuffer = new VertexBuffer(graphics, typeof(CubeVertex), ind, BufferUsage.None);
+                VertexBuffer.SetData<CubeVertex>(vertexBuffer,0,ind);
                 Empty = false;
             }
             else Empty = true;
         }
 
-        public void Initialize(Cube[, ,] parentCubes, Chunk posX, Chunk negX, Chunk posZ, Chunk negZ)
+        public void CollectSubmeshStats(Chunk parent, CubeStorage store)
         {
-            SidesRenderable = 0;
-            Cube neighbor;
             Cube current;
+            Cube neighbor;
+            int worldX = 0;
+            int worldZ = 0;
 
-            int maxIndex = Chunk.WIDTH - 1;
+            int maxY = Chunk.HEIGHT - 1;
+
             for (int x = 0; x < Chunk.WIDTH; x++)
-                for (int y = _yStartIndex; y <= _yEndIndex; y++)
-                    for (int z = 0; z < Chunk.WIDTH; z++)
+            {
+                worldX = x + parent.Coords.X * Chunk.WIDTH;
+                for (int z = 0; z < Chunk.WIDTH; z++)
+                {
+                    worldZ = z + parent.Coords.Z * Chunk.WIDTH;
+                    for (int y = _yStartIndex; y <= _yEndIndex; y++)
                     {
-                        current = parentCubes[x, y, z];
-                        if (!current.IsRenderable()) continue;
+                        store.GetCube(worldX, y, worldZ, out current);
+                        if (!current.IsRenderable) continue;
 
-                        SolidBlocks += 1;
+                        RenderableBlocks += 1;
 
                         //-x
-                        if (x == 0) neighbor = negX.GetCube(maxIndex, y, z);
-                        else neighbor = parentCubes[x - 1, y, z];
-
-                        if (neighbor.IsTransparent()) SidesRenderable += 1;
+                        store.GetCube(worldX - 1, y, worldZ, out neighbor);
+                        if (neighbor.IsTransparent) SidesRenderable++;
 
                         //+x
-                        if (x == maxIndex) neighbor = posX.GetCube(0, y, z);
-                        else neighbor = parentCubes[x + 1, y, z];
+                        store.GetCube(worldX + 1, y, worldZ, out neighbor);
 
-                        if (neighbor.IsTransparent()) SidesRenderable += 1;
+                        if (neighbor.IsTransparent) SidesRenderable++;
 
                         //-y
-                        if (y == _yStartIndex) neighbor = (_yStartIndex != 0) ? parentCubes[x, y - 1, z] : Cube.NULL;
-                        else neighbor = parentCubes[x, y - 1, z];
-
-                        if (neighbor.IsTransparent() && neighbor.Type != CubeType.NULL) SidesRenderable += 1;
+                        if (y != 0) store.GetCube(worldX, y - 1, worldZ, out neighbor);
+                        else neighbor = Cube.NULL;
+                        if (neighbor.IsTransparent && neighbor.Type != CubeType.NULL) SidesRenderable++;
 
                         //+y
-                        if (y == _yEndIndex) neighbor = (_yEndIndex != Chunk.HEIGHT - 1) ? parentCubes[x, y + 1, z] : Cube.NULL;
-                        else neighbor = parentCubes[x, y + 1, z];
-
-                        if (neighbor.IsTransparent() && neighbor.Type != CubeType.NULL) SidesRenderable += 1;
+                        if (y != maxY) store.GetCube(worldX, y + 1, worldZ, out neighbor);
+                        else neighbor = Cube.NULL;
+                        if (neighbor.IsTransparent && neighbor.Type != CubeType.NULL) SidesRenderable++;
 
                         //-z
-                        if (z == 0) neighbor = negZ.GetCube(x, y, maxIndex);
-                        else neighbor = parentCubes[x, y, z - 1];
-
-                        if (neighbor.IsTransparent()) SidesRenderable += 1;
+                        store.GetCube(worldX, y, worldZ - 1, out neighbor);
+                        if (neighbor.IsTransparent) SidesRenderable++;
 
                         //+z
-                        if (z == maxIndex) neighbor = posZ.GetCube(x, y, 0);
-                        else neighbor = parentCubes[x, y, z + 1];
-
-                        if (neighbor.IsTransparent()) SidesRenderable += 1;
+                        store.GetCube(worldX, y, worldZ + 1, out neighbor);
+                        if (neighbor.IsTransparent) SidesRenderable++;
                     }
-
-            SideCountNeeded = false;
+                }
+            }
         }
 
         public void Dispose()
         {
             if(VertexBuffer != null) VertexBuffer.Dispose();
-            //if(TransparentVertexBuffer != null) TransparentVertexBuffer.Dispose();
         }
     }
 }

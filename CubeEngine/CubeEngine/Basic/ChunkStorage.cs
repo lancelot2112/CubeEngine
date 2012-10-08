@@ -12,23 +12,25 @@ namespace CubeEngine.Basic
 
         public List<Chunk> LoadedChunks;
         public int LoadedChunkCount { get { return LoadedChunks.Count; } }
+        public bool ChunksAddedSinceSort;
 
-        private int _dimLength;
-        private float _invDimLength;
+        private int _dimMask;
 
-        public ChunkStorage(int radius)
+        public ChunkStorage(int len)
         {
-            _dimLength = 2 * radius + 2;
-            _invDimLength = 1 / (float)_dimLength;
+            bool lenp2 = (len != 0) && ((len & (len - 1)) == 0);
+            if (!lenp2) throw new NotSupportedException("len is not power of 2.");
 
-            Chunks = new Chunk[_dimLength, _dimLength];
+            _dimMask = len - 1;            
+
+            Chunks = new Chunk[len, len];
             LoadedChunks = new List<Chunk>();
         }
 
         public void Store(Chunk chunk, ChunkManager manager)
         {
-            int x = WrapCoord(chunk.Coords.X);
-            int z = WrapCoord(chunk.Coords.Z);
+            int x = chunk.Coords.X & _dimMask;
+            int z = chunk.Coords.Z & _dimMask;
 
             if (Chunks[x, z] != null)
             {               
@@ -39,6 +41,7 @@ namespace CubeEngine.Basic
             Chunks[x, z] = chunk;
 
             LoadedChunks.Add(chunk);
+            ChunksAddedSinceSort = true;
         }
 
         public void UpdateChunks(float dt, Vector3 deltaPosition)
@@ -51,21 +54,19 @@ namespace CubeEngine.Basic
         }
         public Chunk GetChunk(int x, int z)
         {
-            int X = x;
-            int Z = z;
-            
-            x = WrapCoord(x);
-            z = WrapCoord(z);
+            x = x & _dimMask;
+            z = z & _dimMask;
 
             return Chunks[x, z];
         }
 
-        public bool Contains(ref ChunkCoords coords)
+        public bool Contains(ref ChunkCoords coords, out Chunk chunk)
         {
-            int x = WrapCoord(coords.X);
-            int z = WrapCoord(coords.Z);
+            int x = coords.X & _dimMask;
+            int z = coords.Z & _dimMask;
 
-            return (Chunks[x, z] != null) ? Chunks[x, z].Coords.Equals(ref coords) : false;
+            chunk = Chunks[x, z];
+            return (chunk != null) ? chunk.Coords.Equals(ref coords) : false;
         }
 
         public bool Contains(Chunk chunk)
@@ -73,21 +74,9 @@ namespace CubeEngine.Basic
             return LoadedChunks.Contains(chunk);
         }
 
-        public int WrapCoord(int val)
+        public void WrapIndex(ref int ind)
         {
-            if (val >= _dimLength)
-            {
-                int scale = (int)(val * _invDimLength);
-                val -= _dimLength * scale;
-            }
-            else if (val < 0)
-            {
-                int scale = (int)(-val * _invDimLength+1);
-                val += _dimLength * scale;
-            }
-
-            return val;
-
+            ind &= _dimMask;
         }
 
         

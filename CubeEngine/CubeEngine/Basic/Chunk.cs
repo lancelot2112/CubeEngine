@@ -10,6 +10,22 @@ using System.Threading;
 
 namespace CubeEngine.Basic
 {
+    using log = XerUtilities.Debugging.Logger;
+
+    public enum ChunkState
+    {
+        PendingLoad,
+        Loading,
+        Loaded,
+        PendingLight,
+        Lighting,
+        PendingBuild,
+        Building,
+        Built,
+        PendingRebuild,
+        Unloading,
+    }
+
     /// <summary>
     /// A collection of cubes stored in a 3d array along with a mesh for rendering the terrain.
     /// </summary>
@@ -17,16 +33,20 @@ namespace CubeEngine.Basic
     {
         public static int ObjectCount = 0;
         public const int WIDTH = 16;
-        public const int HEIGHT = 256;
-        public const int DEPENDENCIES_MET_FLAG_VALUE = 15;
+        public const int HEIGHT = 128;
+        public const int DEPENDENCIES_MET_FLAG_VALUE = 255;
 
         /// <summary>
         ///  1: +x
         ///  2: -x
         ///  4: +z
         ///  8: -z
+        ///  16: +x +z
+        ///  32: -x +z
+        ///  64: +x -z
+        ///  128: -x -z
         /// </summary>
-        public byte LoadDependenciesFlag;
+        public byte NeighborsInMemoryFlag;
         public byte LightDependenciesFlag;
         public byte BuildDependenciesFlag;
         public int Xstart;
@@ -36,23 +56,22 @@ namespace CubeEngine.Basic
         public ChunkCoords Coords;
         public Vector3 Position;
 
-        public bool Loaded;
-        public bool Lit;        
-        public bool Empty;
-        public bool Unloading;
+        private ChunkState _state;
+        public ChunkState State { get { return _state; } }
         public bool ChangedSinceLoad;
+        public bool Empty;
 
         public List<ChunkSubMesh> Meshes;
         private int[,] _heightMap;
+
+        public delegate void ChangedStateHandler(ChunkManager manager, Chunk chunk, ChunkState state);
+        public event ChangedStateHandler StateChanged;
         
 
         public Chunk(ChunkManager manager, ref ChunkCoords coords, ref Vector3 initialPosition)
         {            
             ObjectCount += 1;
             ObjectNumber = ObjectCount;
-            manager.ChunkLoadingEvent += ChunkLoadingCallback;
-            manager.ChunkLoadedEvent += ChunkLoadedCallback;
-            manager.ChunkLitEvent += ChunkLitCallback;
             Position = initialPosition;
             Coords = coords;
             _heightMap = new int[WIDTH, WIDTH];
@@ -61,6 +80,7 @@ namespace CubeEngine.Basic
             Xstart = coords.X * Chunk.WIDTH;
             Zstart = coords.Z * Chunk.WIDTH;
             manager.CubeStorage.WrapCoords(ref Xstart, ref Zstart);
+            
             ChangedSinceLoad = false;
             Empty = true;
         }
@@ -70,19 +90,51 @@ namespace CubeEngine.Basic
             Position -= deltaPosition;
         }
 
-        public void ChunkLoadingCallback(ChunkManager manager, Chunk chunk)
+        public void ChangeState(ChunkManager manager, ChunkState newState)
         {
-            LoadDependenciesFlag |= Coords.Neighbors(ref chunk.Coords);
+            log.Write(newState.ToString(), this.ToString(), "");
+            if (StateChanged != null) StateChanged(manager, this, newState);
+            _state = newState;
+        }        
+
+        public void ConsolidateFlags(Chunk chunk, byte neighbors)
+        {
+            if (chunk.State >= ChunkState.Loading) NeighborsInMemoryFlag |= neighbors;
+            if (chunk.State >= ChunkState.Loaded) LightDependenciesFlag |= neighbors;
+            if (chunk.State >= ChunkState.PendingBuild) BuildDependenciesFlag |= neighbors;
         }
 
-        public void ChunkLoadedCallback(ChunkManager manager, Chunk chunk)
+        public void NeighborChangedStateCallback(ChunkManager manager, Chunk chunk, ChunkState state)
         {
-            LightDependenciesFlag |= Coords.Neighbors(ref chunk.Coords);
-        }
-
-        public void ChunkLitCallback(ChunkManager manager, Chunk chunk)
-        {
-            BuildDependenciesFlag |= Coords.Neighbors(ref chunk.Coords);
+            switch (state)
+            {
+                case ChunkState.Loaded:
+                    {
+                        LightDependenciesFlag |= Coords.Neighbors(ref chunk.Coords);
+                        break;
+                    }
+                case ChunkState.PendingLight:
+                    break;
+                case ChunkState.Lighting:
+                    break;
+                case ChunkState.PendingBuild:
+                    {
+                        BuildDependenciesFlag |= Coords.Neighbors(ref chunk.Coords);
+                        break;
+                    }
+                case ChunkState.Built:
+                    break;
+                case ChunkState.PendingRebuild:
+                    break;
+                case ChunkState.Unloading:
+                    {
+                        byte val = Coords.Neighbors(ref chunk.Coords);
+                        if((NeighborsInMemoryFlag & val) == val) NeighborsInMemoryFlag -= val;
+                        if((LightDependenciesFlag & val) == val) LightDependenciesFlag -= val;
+                        if((BuildDependenciesFlag & val) == val) BuildDependenciesFlag -= val;
+                        break;
+                    }
+            }
         }
 
         public void PropagateSun(CubeStorage store)
@@ -140,8 +192,6 @@ namespace CubeEngine.Basic
                     }
                 }
             }
-
-            Lit = true;
         }
         public void BuildVertices(CubeVertex[] buffer, GraphicsDevice graphics, CubeStorage store)
         {
@@ -178,8 +228,8 @@ namespace CubeEngine.Basic
         {
             StringBuilder builder = new StringBuilder();
             builder.AppendLine(Coords.ToString());
-            builder.AppendLine("loF: " + LoadDependenciesFlag.ToString() +"|liF: " + LightDependenciesFlag.ToString() + "|buF: " + BuildDependenciesFlag.ToString());
-            builder.AppendLine("load: " + Loaded.ToString() + "|lit: " + Lit.ToString() + "|empty: " + Empty.ToString() + "|changed: " + ChangedSinceLoad.ToString());
+            builder.AppendLine("loF: " + NeighborsInMemoryFlag.ToString() +"|liF: " + LightDependenciesFlag.ToString() + "|buF: " + BuildDependenciesFlag.ToString());
+            builder.AppendLine("state: " + State.ToString() + "|empty: " + Empty.ToString() + "|changed: " + ChangedSinceLoad.ToString());
             return builder.ToString();
         }
     }

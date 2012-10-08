@@ -54,15 +54,30 @@ namespace CubeEngine.Basic
             coords.WrapDistance = WrapDistance;
         }
 
+        public void Add(int x, int z, out ChunkCoords coords)
+        {
+            x = X + x;
+            z = Z + z;
+            if (Math.Abs(x) > WrapDistance) x = -x;
+            if (Math.Abs(z) > WrapDistance) z = -z;
+            coords.X = x;
+            coords.Z = z;
+            coords.WrapDistance = WrapDistance;
+        }
+
         public byte Neighbors(ref ChunkCoords coord2)
         {
             int diffX = coord2.X - X;
             int diffZ = coord2.Z - Z;
 
             if (diffZ == 0 && diffX == 1) return 1;
-            else if ( diffZ == 0 && diffX == -1) return 2;
-            else if ( diffX == 0 && diffZ == 1) return 4;
-            else if ( diffX == 0 && diffZ == -1) return 8;            
+            else if (diffZ == 0 && diffX == -1) return 2;
+            else if (diffX == 0 && diffZ == 1) return 4;
+            else if (diffX == 0 && diffZ == -1) return 8;
+            else if (diffX == 1 && diffZ == 1) return 16;
+            else if (diffX == -1 && diffZ == 1) return 32;
+            else if (diffX == 1 && diffZ == -1) return 64;
+            else if (diffX == -1 && diffZ == -1) return 128;
             else return 0;
         }
 

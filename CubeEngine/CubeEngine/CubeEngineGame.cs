@@ -179,15 +179,16 @@ namespace CubeEngine
             debug.DebugDisplay.AddLine(4,"mesh: " + SubMeshesDrawn.ToString() + "/" + TotalSubMeshes.ToString());
             debug.DebugDisplay.AddLine(5, "chunk: " + chunkManager.DrawList.Count.ToString() + "/" + chunkManager.LoadedChunkCount.ToString());
             debug.DebugDisplay.AddLine(6, "pos: " + prevPosition.ToString());
-            debug.DebugDisplay.AddLine(7, "updateTotal: " + chunkManager.TotalUpdateTime.ToString() + " ms");
-            debug.DebugDisplay.AddLine(8, "queue: " + chunkManager.QueueTime.ToString() + " ms");
-            debug.DebugDisplay.AddLine(9, "load: " + chunkManager.LoadTime.ToString() + " ms");
-            debug.DebugDisplay.AddLine(10, "light: " + chunkManager.LightTime.ToString() + " ms");
-            debug.DebugDisplay.AddLine(11, "build: " + chunkManager.BuildTime.ToString() + " ms");
-            debug.DebugDisplay.AddLine(12, "rebuild: " + chunkManager.RebuildTime.ToString() + " ms");
-            debug.DebugDisplay.AddLine(13, "update: " + chunkManager.UpdateTime.ToString() + " ms");
-            debug.DebugDisplay.AddLine(14, "unload: " + chunkManager.UnloadTime.ToString() + " ms");
-            debug.DebugDisplay.AddLine(15, "draw: " + watch.Elapsed.TotalMilliseconds.ToString() + " ms");
+            debug.DebugDisplay.AddLine(7, "posC: " + chunkManager.PlayerPosition.ToString());
+            debug.DebugDisplay.AddLine(8, "updateTotal: " + chunkManager.TotalUpdateTime.ToString() + " ms");
+            debug.DebugDisplay.AddLine(9, "queue: " + chunkManager.QueueTime.ToString() + " ms");
+            debug.DebugDisplay.AddLine(10, "load: " + chunkManager.LoadTime.ToString() + " ms");
+            debug.DebugDisplay.AddLine(11, "light: " + chunkManager.LightTime.ToString() + " ms");
+            debug.DebugDisplay.AddLine(12, "build: " + chunkManager.BuildTime.ToString() + " ms");
+            debug.DebugDisplay.AddLine(13, "rebuild: " + chunkManager.RebuildTime.ToString() + " ms");
+            debug.DebugDisplay.AddLine(14, "update: " + chunkManager.UpdateTime.ToString() + " ms");
+            debug.DebugDisplay.AddLine(15, "unload: " + chunkManager.UnloadTime.ToString() + " ms");
+            debug.DebugDisplay.AddLine(16, "draw: " + watch.Elapsed.TotalMilliseconds.ToString() + " ms");
             // TODO: Add your drawing code here
 
             base.Draw(gameTime);

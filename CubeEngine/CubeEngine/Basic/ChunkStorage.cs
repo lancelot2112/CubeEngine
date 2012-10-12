@@ -60,7 +60,7 @@ namespace CubeEngine.Basic
             return Chunks[x, z];
         }
 
-        public bool Contains(ref ChunkCoords coords, out Chunk chunk)
+        public bool Contains(ref ChunkCoordinate coords, out Chunk chunk)
         {
             int x = coords.X & _dimMask;
             int z = coords.Z & _dimMask;
@@ -79,6 +79,21 @@ namespace CubeEngine.Basic
             ind &= _dimMask;
         }
 
-        
+        public void UnloadAll(ChunkManager manager)
+        {
+            for (int i = 0; i < LoadedChunks.Count; i++)
+            {
+                manager.PrepareChunkForUnload(LoadedChunks[i]);
+            }
+            LoadedChunks.Clear();
+
+            for (int x = 0; x <= _dimMask; x++)
+            {
+                for (int z = 0; z <= _dimMask; z++)
+                {
+                    Chunks[x, z] = null;
+                }
+            }
+        }
     }
 }

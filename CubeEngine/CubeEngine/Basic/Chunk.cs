@@ -32,7 +32,7 @@ namespace CubeEngine.Basic
     public class Chunk
     {
         public static int ObjectCount = 0;
-        public const int WIDTH = 16;
+        public const int WIDTH = 32;
         public const int HEIGHT = 128;
         public const int DEPENDENCIES_MET_FLAG_VALUE = 255;
 
@@ -53,7 +53,7 @@ namespace CubeEngine.Basic
         public int Zstart;
         public int ObjectNumber;
 
-        public ChunkCoords Coords;
+        public ChunkCoordinate Coords;
         public Vector3 Position;
 
         private ChunkState _state;
@@ -61,21 +61,21 @@ namespace CubeEngine.Basic
         public bool ChangedSinceLoad;
         public bool Empty;
 
-        public List<ChunkSubMesh> Meshes;
+        public List<ChunkMesh> Meshes;
         private int[,] _heightMap;
 
         public delegate void ChangedStateHandler(ChunkManager manager, Chunk chunk, ChunkState state);
         public event ChangedStateHandler StateChanged;
         
 
-        public Chunk(ChunkManager manager, ref ChunkCoords coords, ref Vector3 initialPosition)
+        public Chunk(ChunkManager manager, ref ChunkCoordinate coords, ref Vector3 initialPosition)
         {            
             ObjectCount += 1;
             ObjectNumber = ObjectCount;
             Position = initialPosition;
             Coords = coords;
             _heightMap = new int[WIDTH, WIDTH];
-            Meshes = new List<ChunkSubMesh>();
+            Meshes = new List<ChunkMesh>();
 
             Xstart = coords.X * Chunk.WIDTH;
             Zstart = coords.Z * Chunk.WIDTH;
@@ -88,11 +88,16 @@ namespace CubeEngine.Basic
         public void Update(float dt, Vector3 deltaPosition)
         {
             Position -= deltaPosition;
+
+            for (int i = 0; i < Meshes.Count; i++)
+            {
+                Meshes[i].Update(Position);
+            }
         }
 
         public void ChangeState(ChunkManager manager, ChunkState newState)
         {
-            log.Write(newState.ToString(), this.ToString(), "");
+            //log.Write(newState.ToString(), this.ToString(), "");
             if (StateChanged != null) StateChanged(manager, this, newState);
             _state = newState;
         }        
@@ -132,6 +137,10 @@ namespace CubeEngine.Basic
                         if((NeighborsInMemoryFlag & val) == val) NeighborsInMemoryFlag -= val;
                         if((LightDependenciesFlag & val) == val) LightDependenciesFlag -= val;
                         if((BuildDependenciesFlag & val) == val) BuildDependenciesFlag -= val;
+
+                        StateChanged -= chunk.NeighborChangedStateCallback;
+                        chunk.StateChanged -= NeighborChangedStateCallback;
+
                         break;
                     }
             }
@@ -184,7 +193,7 @@ namespace CubeEngine.Basic
                         if (sun < negZsun) sun = negZsun;
                         if (sun > curr.SunLight) store.SetSunlight(x, y, z, sun);
 
-                        attenuated = sun - 1;
+                        attenuated = sun-1;
                         if (posXsun + 1 < attenuated && x == startX + maxIndex) store.SetSunlight(x + 1, y, z, attenuated);
                         else if (negXsun + 1 < attenuated && x == startX) store.SetSunlight(x - 1, y, z, attenuated);
                         if (posZsun + 1 < attenuated && z == startZ + maxIndex) store.SetSunlight(x, y, z + 1, attenuated);
@@ -195,11 +204,11 @@ namespace CubeEngine.Basic
         }
         public void BuildVertices(CubeVertex[] buffer, GraphicsDevice graphics, CubeStorage store)
         {
-            ChunkSubMesh currentMesh;
+            ChunkMesh currentMesh;
             int i = 0;
             while(i < HEIGHT)
             {
-                currentMesh = new ChunkSubMesh(i, ref Position);
+                currentMesh = new ChunkMesh(i, ref Position);
                 currentMesh.BuildVertices(buffer, graphics, this, store);
                 if (!currentMesh.Empty) Meshes.Add(currentMesh);
                 i += Chunk.WIDTH;

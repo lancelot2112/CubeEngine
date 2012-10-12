@@ -9,6 +9,6 @@ namespace CubeEngine.Actors
 {
     public class LocalPlayer
     {
-        public ChunkCoords Coordinates;
+        public ChunkCoordinate Coordinates;
     }
 }

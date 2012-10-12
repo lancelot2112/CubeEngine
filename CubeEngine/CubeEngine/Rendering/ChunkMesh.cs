@@ -4,15 +4,15 @@ using System.Linq;
 using System.Text;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using CubeEngine.Rendering;
+using CubeEngine.Basic;
 
 
 
-namespace CubeEngine.Basic
+namespace CubeEngine.Rendering
 {
     using log = XerUtilities.Debugging.Logger;
 
-    public class ChunkSubMesh
+    public class ChunkMesh
     {
         
 
@@ -27,11 +27,12 @@ namespace CubeEngine.Basic
 
         //Render Members
         public bool AllowRender;
+        public bool Transparent;
         public bool Empty;
         public bool SideCountNeeded;
         public VertexBuffer VertexBuffer;
 
-        public ChunkSubMesh(int yStartIndex, ref Vector3 chunkPosition)
+        public ChunkMesh(int yStartIndex, ref Vector3 chunkPosition)
         {
             _yStartIndex = yStartIndex;
             _yEndIndex = yStartIndex + Chunk.WIDTH - 1;

@@ -15,9 +15,6 @@ namespace CubeEngine.Rendering
         public Vector3 VertexPosition;
         public NormalizedByte4 Normal;
         public Vector2 Texture;
-        //public Byte4 Texture;
-        //public Byte4 ColorInformation;
-        //public Byte4 LightInformation;
         public byte Red, Green, Blue, Alpha;
         public byte LocalRed, LocalGreen, LocalBlue, LocalLight;
         public short Luminance, SkyLight;
@@ -48,11 +45,6 @@ namespace CubeEngine.Rendering
             this.LocalBlue = (byte)((n1.LocalBlue + n2.LocalBlue + n3.LocalBlue + n4.LocalBlue) * 0.25f);
             this.LocalLight = (byte)((n1.LocalLight + n2.LocalLight + n3.LocalLight + n4.LocalLight) * 0.25f);
             this.SkyLight = (byte)((n1.SunLight + n2.SunLight + n3.SunLight + n4.SunLight) * 0.25f);
-
-
-            //this.Texture = new Byte4(texture.X, texture.Y, neighbor.SunLight, cube.Specular);
-            //this.ColorInformation = new Byte4(cube.Red, cube.Green, cube.Blue, cube.Alpha);
-            //this.LightInformation = new Byte4(neighbor.LocalRed, neighbor.LocalGreen, neighbor.LocalBlue, neighbor.LocalLight);
         }
 
         VertexDeclaration IVertexType.VertexDeclaration { get { return VertexDeclaration; } }
@@ -65,6 +57,15 @@ namespace CubeEngine.Rendering
         public static Vector3 CORNER_NPN = new Vector3(0f, 1f, 0f);
         public static Vector3 CORNER_NNP = new Vector3(0f, 0f, 1f);
         public static Vector3 CORNER_NNN = new Vector3(0f, 0f, 0f);
+
+        //public static Vector3 CORNER_PPP = new Vector3(1.0001f, 1.0001f, 1.0001f);
+        //public static Vector3 CORNER_PPN = new Vector3(1.0001f, 1.0001f, -0.0001f);
+        //public static Vector3 CORNER_PNP = new Vector3(1.0001f, -0.0001f, 1.0001f);
+        //public static Vector3 CORNER_PNN = new Vector3(1.0001f, -0.0001f, -0.0001f);
+        //public static Vector3 CORNER_NPP = new Vector3(-0.0001f, 1.0001f, 1.0001f);
+        //public static Vector3 CORNER_NPN = new Vector3(-0.0001f, 1.0001f, -0.0001f);
+        //public static Vector3 CORNER_NNP = new Vector3(-0.0001f, -0.0001f, 1.0001f);
+        //public static Vector3 CORNER_NNN = new Vector3(-0.0001f, -0.0001f, -0.0001f);
 
         public static Vector2 TC00 = new Vector2(0, 0);
         public static Vector2 TC01 = new Vector2(0, 1);

@@ -15,6 +15,7 @@ using XerUtilities.Debugging;
 using XerUtilities.Input;
 using XerUtilities.Rendering;
 using System.Diagnostics;
+using CubeEngine.Rendering;
 
 namespace CubeEngine
 {
@@ -28,7 +29,6 @@ namespace CubeEngine
         ChunkManager chunkManager;
         XerInput input;
         DeltaFreeCamera camera;
-        Effect effect;
         RasterizerState currentRaster;
         Stopwatch watch;
 
@@ -36,6 +36,9 @@ namespace CubeEngine
         {
             graphics = new GraphicsDeviceManager(this);
             debug = new DebugManager(this, "Font/Arial", true);
+            debug.Console.Execute("clr.AddReference(\"CubeEngine\")");
+            debug.Console.Execute("from CubeEngine import *");
+            debug.Console.AddObject("game", this);
             Content.RootDirectory = "Content";
         }
 
@@ -49,6 +52,7 @@ namespace CubeEngine
         {
             input = new XerInput(this);            
             camera = new DeltaFreeCamera(input, GraphicsDevice);
+            debug.Console.AddObject("camera", camera);
             watch = new Stopwatch();
             base.Initialize();
         }
@@ -59,9 +63,9 @@ namespace CubeEngine
         /// </summary>
         protected override void LoadContent()
         {
-            effect = Content.Load<Effect>("Effects/CubeEffect");
-            chunkManager = new ChunkManager(GraphicsDevice, new ChunkCoords(0,0,8000), new Vector3(0f,160f,0f), true);
-            currentRaster = RasterizerState.CullNone;
+            chunkManager = new ChunkManager(this, new ChunkCoordinate(0,0,8000), new Vector3(0f,Chunk.HEIGHT * 0.9f,0f), true);
+            debug.Console.AddObject("chunkManager", chunkManager);
+            currentRaster = RasterizerState.CullCounterClockwise;
 
             // TODO: use this.Content to load your game content here
         }
@@ -80,7 +84,7 @@ namespace CubeEngine
         /// checking for collisions, gathering input, and playing audio.
         /// </summary>
         /// <param name="gameTime">Provides a snapshot of timing values.</param>
-        ChunkCoords prevPosition = new ChunkCoords();
+        ChunkCoordinate prevPosition = new ChunkCoordinate();
         Vector2 move = Vector2.Zero;
         protected override void Update(GameTime gameTime)
         {
@@ -95,17 +99,14 @@ namespace CubeEngine
 
             chunkManager.Update(dt, prevPosition, camera.Translation);
 
-            if(input.Keyboard.F2JustPressed) 
-            {
-                RasterizerState previous = currentRaster;
-                currentRaster = new RasterizerState();
-                currentRaster.CullMode = previous.FillMode == FillMode.Solid ? CullMode.None : CullMode.CullCounterClockwiseFace;
-                currentRaster.FillMode = previous.FillMode == FillMode.Solid ? FillMode.WireFrame : FillMode.Solid;  
-            }
-
             if (input.Keyboard.F3JustPressed)
             {
                 chunkManager.PrintStats();
+            }
+
+            if (input.Keyboard.F4JustPressed)
+            {
+                chunkManager.Reload();
             }
 
             // TODO: Add your update logic here
@@ -126,58 +127,10 @@ namespace CubeEngine
 
             GraphicsDevice.Clear(Color.CornflowerBlue);
 
-            effect.Parameters["Projection"].SetValue(camera.Projection);
-            effect.Parameters["View"].SetValue(camera.View);
-            effect.Parameters["SkyLightDir"].SetValue(Vector3.Normalize(new Vector3(0.5f,0.75f,1.0f)));
+            chunkManager.Draw(GraphicsDevice, camera);
 
-            int VerticesDrawn = 0;
-            int SidesDrawn = 0;
-            int CubesDrawn = 0;
-            int SubMeshesDrawn = 0;
-            int TotalSubMeshes = 0;
-
-            Chunk chunk;
-            ChunkSubMesh mesh;
-            BoundingBox bound;
-
-            for (int i = 0; i < chunkManager.DrawList.Count; i++)
-            {
-            chunk = chunkManager.DrawList[i];
-                for (int j = 0; j < chunk.Meshes.Count; j++)
-                {
-                    mesh = chunk.Meshes[j];
-                    mesh.Update(chunk.Position);
-                    mesh.GetBoundingBox(out bound);
-                    BoundingBoxRenderer.Render(bound,GraphicsDevice,camera.View,camera.Projection, Color.Blue);
-                    TotalSubMeshes += 1;
-                    if (camera.ViewFrustum.Contains(bound) != ContainmentType.Disjoint)
-                    {
-                        effect.Parameters["World"].SetValue(Matrix.CreateTranslation(mesh.Position));
-
-                        SubMeshesDrawn++;
-
-                        GraphicsDevice.SetVertexBuffer(mesh.VertexBuffer);
-
-                        foreach (EffectPass pass in effect.CurrentTechnique.Passes)
-                        {
-                            pass.Apply();
-                            GraphicsDevice.DrawPrimitives(PrimitiveType.TriangleList, 0, mesh.VertexBuffer.VertexCount / 3);
-
-                            VerticesDrawn += mesh.VertexBuffer.VertexCount;
-                            SidesDrawn += mesh.SidesRenderable;
-                            CubesDrawn += mesh.RenderableBlocks;
-                        }
-                    }
-                }
-            }
             watch.Stop();
 
-
-            debug.DebugDisplay.AddLine(1,"vertices: " + (VerticesDrawn*.00001f).ToString() + "*10^6");
-            debug.DebugDisplay.AddLine(2,"sides: " + (SidesDrawn*.00001f).ToString() + "*10^6");
-            debug.DebugDisplay.AddLine(3,"cube: " + (CubesDrawn*.001f).ToString() + "*10^4");
-            debug.DebugDisplay.AddLine(4,"mesh: " + SubMeshesDrawn.ToString() + "/" + TotalSubMeshes.ToString());
-            debug.DebugDisplay.AddLine(5, "chunk: " + chunkManager.DrawList.Count.ToString() + "/" + chunkManager.LoadedChunkCount.ToString());
             debug.DebugDisplay.AddLine(6, "pos: " + prevPosition.ToString());
             debug.DebugDisplay.AddLine(7, "posC: " + chunkManager.PlayerPosition.ToString());
             debug.DebugDisplay.AddLine(8, "updateTotal: " + chunkManager.TotalUpdateTime.ToString() + " ms");

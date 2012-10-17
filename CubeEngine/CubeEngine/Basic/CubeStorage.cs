@@ -5,7 +5,7 @@ using System.Text;
 
 namespace CubeEngine.Basic
 {
-    public class CubeStorage
+    public class CubeStorage 
     {
         public Cube[, ,] Cubes;
 
@@ -36,7 +36,7 @@ namespace CubeEngine.Basic
             cube = Cubes[x, y, z];
         }
 
-        public void SafeGetCube(int x, int y, int z, out Cube cube)
+        public void CheckYGetCube(int x, int y, int z, out Cube cube)
         {
             if (y < 0 || y >= _lenY)
             {
@@ -50,7 +50,7 @@ namespace CubeEngine.Basic
 
             cube = Cubes[x, y, z];
         }
-        public void SetCube(int x, int y, int z, ref Cube cube)
+        public void SetMaterialAt(int x, int y, int z, ref Cube cube)
         {
             //Wrap coords so that the array is a 3d circular queue
             x = x & _maskX;

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -16,6 +17,7 @@ namespace CubeEngine.Basic
     using log = XerUtilities.Debugging.Logger;
     using XerUtilities.Rendering;
     using Microsoft.Xna.Framework.Content;
+    using XerUtilities.DataStructures.Parallel;
 
     /// <summary>
     /// Chunk Manager general flow
@@ -60,10 +62,10 @@ namespace CubeEngine.Basic
         public const float TIME_BETWEEN_LOADS = .5f;
         public const float TIME_BETWEEN_LIGHTS = .5f;
         public const float TIME_BETWEEN_BUILDS = .5f;
-        public static int CHUNK_BUILD_DIST = 10;
         //WARN: When load dist is a power of 2 queue chunks infinitely contest being added to the circular buffer
-        public static int CHUNK_LOAD_DIST = 8;
-        public static int CHUNK_LIGHT_DIST = CHUNK_LOAD_DIST - 2;
+        public static int CHUNK_LOAD_DIST = 16;
+        public static int CHUNK_LIGHT_DIST = CHUNK_LOAD_DIST;
+        public static int CHUNK_BUILD_DIST = CHUNK_LOAD_DIST;
         
 
         //public static int xOffset = (int)(xChunkNumber * 0.5f);
@@ -98,12 +100,21 @@ namespace CubeEngine.Basic
          * in queues at a higher priority.  Chunks closer to player and in line get even higher priority
          * etc.  Will need a priority algorithm.
          */
-        private Queue<Chunk> _loadQueue;
-        public List<Chunk> LightQueue;
-        public List<Chunk> BuildQueue;
+        private class ChunkTask
+        {
+            public Chunk Chunk;
+            public Action<Chunk> Execute;
+        }
+        private ConcurrentSerialQueue<ChunkTask> _taskQueue;
+
+        private ConcurrentSerialQueue<Chunk> _loadQueue;
+        public ConcurrentSerialQueue<Chunk> LightQueue;
+        public ConcurrentSerialQueue<Chunk> BuildQueue;
         public Queue<Chunk> RebuildQueue;
-        public Queue<Chunk> UnloadQueue;
+        public ConcurrentSerialQueue<Chunk> UnloadQueue;
         public List<Chunk> DrawList;
+
+        //public ConcurrentQueue<Chunk> 
 
         public ChunkCoordinate PlayerPosition;
         public ChunkCoordinate PreviousPlayerPosition;
@@ -133,18 +144,18 @@ namespace CubeEngine.Basic
             //WARN: When load dist is a power of 2 queue chunks infinitely adds delegates to the ChunkStateChange event resulting in an eventual
             //out of memory exception.
             CHUNK_LOAD_DIST = width / 2-1;
-            CHUNK_LIGHT_DIST = CHUNK_LOAD_DIST - 2;
-            CHUNK_BUILD_DIST = CHUNK_LIGHT_DIST - 1;
+            CHUNK_LIGHT_DIST = CHUNK_LOAD_DIST;// -1;
+            CHUNK_BUILD_DIST = CHUNK_LIGHT_DIST;// -1;
             width *= Chunk.WIDTH;
             CubeStorage = new CubeStorage(width, Chunk.HEIGHT, width);
-            
-            _loadQueue = new Queue<Chunk>();
+
+            _loadQueue = new ConcurrentSerialQueue<Chunk>();
             _vertexBuffer = new CubeVertex[1000];
 
-            LightQueue = new List<Chunk>();
-            BuildQueue = new List<Chunk>();
+            LightQueue = new ConcurrentSerialQueue<Chunk>();
+            BuildQueue = new ConcurrentSerialQueue<Chunk>();
             RebuildQueue = new Queue<Chunk>();
-            UnloadQueue = new Queue<Chunk>();
+            UnloadQueue = new ConcurrentSerialQueue<Chunk>();
             DrawList = new List<Chunk>();
 
             _timeSinceQueue = TIME_BETWEEN_QUEUES;
@@ -155,41 +166,51 @@ namespace CubeEngine.Basic
             _running = true;
             _running = true;
             _running = true;
-            _running = true;
-
-            //Initialize chunk loading.
-            positionInChunk = -positionInChunk;
-            Chunk seed = new Chunk(this, ref chunkPlayerIsIn, ref positionInChunk);
-            _loadQueue.Enqueue(seed);
-            ChunkStorage.Store(seed, this);            
+            _running = true;         
 
             watch1 = new Stopwatch();
             watch2 = new Stopwatch();
 
             Thread thread = new Thread(LoadChunks);
             thread.IsBackground = true;
-            thread.Name = "LoadThread";
+            thread.SetApartmentState(ApartmentState.MTA);
+            thread.Name = "LoadThread1";
             thread.Priority = ThreadPriority.Lowest;
             thread.Start();
 
+            //thread = new Thread(LoadChunks);
+            //thread.IsBackground = true;
+            //thread.SetApartmentState(ApartmentState.MTA);
+            //thread.Name = "LoadThread2";
+            //thread.Priority = ThreadPriority.Lowest;
+            //thread.Start();
+
             thread = new Thread(LightChunks);
             thread.IsBackground = true;
+            thread.SetApartmentState(ApartmentState.MTA);
             thread.Name = "LightThread";
             thread.Priority = ThreadPriority.Lowest;
             thread.Start();
 
             thread = new Thread(BuildChunkVertices);
             thread.IsBackground = true;
+            thread.SetApartmentState(ApartmentState.MTA);
             thread.Name = "BuildThread";
             thread.Priority = ThreadPriority.Lowest;
             thread.Start();
+
+            //Initialize chunk loading.
+            positionInChunk = -positionInChunk;
+            Chunk seed = new Chunk(this, ref chunkPlayerIsIn, ref positionInChunk);
+            _loadQueue.TryAdd(seed);
+            ChunkStorage.Store(seed, this);   
         }
 
         public void AddChunk(Chunk chunk)
         {
             if (chunk == null) throw new NullReferenceException("Chunk cannot be null.");
             ChunkStorage.Store(chunk, this);
-            _loadQueue.Enqueue(chunk);            
+            _loadQueue.TryAdd(chunk);
             _chunksQueuedThisFrame++;
         }
 
@@ -253,8 +274,25 @@ namespace CubeEngine.Basic
             ChunkCoordinate chunkPlayerIsIn = new ChunkCoordinate(0, 0, 8000);
             Chunk seed = new Chunk(this, ref chunkPlayerIsIn, ref positionInChunk);
             ChunkStorage.Store(seed, this);
-            _loadQueue.Enqueue(seed);
+            _loadQueue.TryAdd(seed);
+            Monitor.Pulse(_loadQueue);
         }
+
+        //TODO: Implement functionality.
+        private void Dispatcher()
+        {
+            ChunkTask task;
+            while (_running)
+            {
+                while(_taskQueue.TryTake(out task))
+                {
+                    task.Execute(task.Chunk);
+                }
+
+                lock (_taskQueue.SyncRoot) while(_taskQueue.Count ==0) Monitor.Wait(_taskQueue.SyncRoot,1000);                
+            }
+        }
+
         public void ManageChunks()
         {
             _chunksQueuedThisFrame = 0;
@@ -274,7 +312,7 @@ namespace CubeEngine.Basic
                     case ChunkState.Loaded:
                         {
                             if (dist < CHUNK_LOAD_DIST && curr.NeighborsInMemoryFlag != Chunk.DEPENDENCIES_MET_FLAG_VALUE)
-                            {                                
+                            {
                                 QueueNeighbors(curr);
                                 //log.Write("queueingMan", curr.ToString(), "");
                                 curr.ChangeState(this, ChunkState.PendingLight);
@@ -284,10 +322,10 @@ namespace CubeEngine.Basic
                     case ChunkState.PendingLight:
                         {
                             if (dist <= CHUNK_LIGHT_DIST & curr.LightDependenciesFlag == Chunk.DEPENDENCIES_MET_FLAG_VALUE)
-                            {                                
+                            {
                                 curr.ChangeState(this, ChunkState.Lighting);
                                 //log.Write("lightingMan", curr.ToString(), "");
-                                LightQueue.Add(curr);                                
+                                LightQueue.TryAdd(curr);
                             }
                             else if (dist < CHUNK_LOAD_DIST && curr.NeighborsInMemoryFlag != Chunk.DEPENDENCIES_MET_FLAG_VALUE)
                             {
@@ -298,10 +336,10 @@ namespace CubeEngine.Basic
                     case ChunkState.PendingBuild:
                         {
                             if (dist <= CHUNK_BUILD_DIST & curr.BuildDependenciesFlag == Chunk.DEPENDENCIES_MET_FLAG_VALUE)
-                            {                                
+                            {
                                 curr.ChangeState(this, ChunkState.Building);
                                 //log.Write("buildingMan", curr.ToString(), "");
-                                BuildQueue.Add(curr);
+                                BuildQueue.TryAdd(curr);
                             }
                             else if (dist < CHUNK_LOAD_DIST && curr.NeighborsInMemoryFlag != Chunk.DEPENDENCIES_MET_FLAG_VALUE)
                             {
@@ -318,6 +356,7 @@ namespace CubeEngine.Basic
                             break;
                         }
                 }
+
             }
         }
 
@@ -573,7 +612,7 @@ namespace CubeEngine.Basic
         {
             
             Chunk curr;
-            Cube air = new Cube(CubeType.Air);
+            Cube air = new Cube(CubeMaterial.None,0);
             Cube cube;
             float noisevalue;
             int worldX;
@@ -587,13 +626,13 @@ namespace CubeEngine.Basic
 
             while (_running)
             {
-                Monitor.Enter(_loadQueue);
-                while (_loadQueue.Count == 0) Monitor.Wait(_loadQueue, 10);
-                Monitor.Exit(_loadQueue);
-
-                while (_loadQueue.Count > 0)//&& _numToLoad > 0)
+                lock (_loadQueue.SyncRoot)
                 {
-                    curr = _loadQueue.Dequeue();
+                    Monitor.Wait(_loadQueue.SyncRoot, 500);
+                }
+
+                while (_loadQueue.TryTake(out curr))
+                {
                     if (curr.State == ChunkState.Unloading) continue;
 
                     if (!curr.LoadFromDisk())
@@ -617,8 +656,8 @@ namespace CubeEngine.Basic
 
                                 for (int y = 0; y < height; y++)
                                 {
-                                    cube = new Cube(CubeType.Stone);
-                                    CubeStorage.SetCube(worldX, y, worldZ, ref cube);
+                                    cube = new Cube(CubeMaterial.Stone,0);
+                                    CubeStorage.SetMaterialAt(worldX, y, worldZ, ref cube);
                                 }
 
                                 finalHeight = height;
@@ -627,15 +666,15 @@ namespace CubeEngine.Basic
                                     finalHeight = (mountain<=Chunk.HEIGHT)?mountain:Chunk.HEIGHT;
                                     for (int y = height; y < finalHeight; y++)
                                     {
-                                        cube = new Cube(CubeType.Dirt);
-                                        CubeStorage.SetCube(worldX, y, worldZ, ref cube);
+                                        cube = new Cube(CubeMaterial.Dirt,0);
+                                        CubeStorage.SetMaterialAt(worldX, y, worldZ, ref cube);
                                     }
                                 }
 
                                 for (int y = finalHeight; y < Chunk.HEIGHT; y++)
                                 {
-                                    cube = new Cube(CubeType.Air);
-                                    CubeStorage.SetCube(worldX, y, worldZ, ref cube);
+                                    cube = new Cube(CubeMaterial.None,0);
+                                    CubeStorage.SetMaterialAt(worldX, y, worldZ, ref cube);
                                 }
 
 
@@ -647,8 +686,8 @@ namespace CubeEngine.Basic
 
                                     if(noisevalue < -0.5f)
                                     {
-                                        cube = new Cube(CubeType.Air);
-                                        CubeStorage.SetCube(worldX, y, worldZ, ref cube);
+                                        cube = new Cube(CubeMaterial.None,0);
+                                        CubeStorage.SetMaterialAt(worldX, y, worldZ, ref cube);
                                     }
                                 }
 
@@ -671,25 +710,19 @@ namespace CubeEngine.Basic
 
             while (_running)
             {
-                Monitor.Enter(LightQueue);
-                Monitor.Wait(LightQueue, 15);
-                Monitor.Exit(LightQueue);
-
-                if(LightQueue.Count > PER_TICK_CHUNKS_LIGHT) LightQueue.Sort((x, y) => x.Coords.CompareDistance(ref y.Coords, ref PlayerPosition));
-
-                while (LightQueue.Count > 0 && _numToLight>0)
+                lock (LightQueue.SyncRoot)
                 {
-                    curr = LightQueue[0];
-                    if (curr.State == ChunkState.Unloading)
-                    {
-                        LightQueue.Remove(curr);
-                        continue;
-                    }
+                    Monitor.Wait(LightQueue.SyncRoot, 500);
+                }
+
+                while (LightQueue.TryTake(out curr))// && _numToLight>0)
+                {
+                    if (curr.State == ChunkState.Unloading) continue;
+                    
 
                     curr.PropagateSun(CubeStorage);
 
                     curr.ChangeState(this, ChunkState.PendingBuild);
-                    LightQueue.RemoveAt(0);
                     _numToLight--;
                 }
             }
@@ -700,20 +733,14 @@ namespace CubeEngine.Basic
             Chunk curr;
             while (_running)
             {
-                Monitor.Enter(BuildQueue);
-                Monitor.Wait(BuildQueue, 25);
-                Monitor.Exit(BuildQueue);
-
-                if(BuildQueue.Count > PER_TICK_CHUNKS_BUILD) BuildQueue.Sort((x, y) => x.Coords.CompareDistance(ref y.Coords, ref PlayerPosition));
-
-                while (BuildQueue.Count > 0 && _numToBuild>0)
+                lock (BuildQueue.SyncRoot)
                 {
-                    curr = BuildQueue[0];
-                    if (curr.State == ChunkState.Unloading)
-                    {
-                        BuildQueue.Remove(curr);
-                        continue;
-                    }
+                    Monitor.Wait(BuildQueue.SyncRoot, 500);
+                }
+
+                while (BuildQueue.TryTake(out curr) && _numToBuild>0)
+                {
+                    if (curr.State == ChunkState.Unloading) continue;
 
                     curr.BuildVertices(_vertexBuffer, _graphics, CubeStorage);
 
@@ -724,7 +751,6 @@ namespace CubeEngine.Basic
                     }
 
                     curr.ChangeState(this, ChunkState.Built);
-                    BuildQueue.RemoveAt(0);
                     _numToBuild--;
                 }
             }
@@ -733,6 +759,7 @@ namespace CubeEngine.Basic
 
         public void RebuildChunkVertices()
         {
+
         }
 
         public void Draw(GraphicsDevice graphics, Camera camera)
@@ -754,15 +781,13 @@ namespace CubeEngine.Basic
             if (!closing)
             {
 		        Chunk temp;
-                for (int i = 0; i < UnloadQueue.Count; i++)
+                while(UnloadQueue.TryTake(out temp))
                 {
-                    temp = UnloadQueue.Dequeue();
                     if(temp.ChangedSinceLoad) temp.SaveToDisk();                    
                     temp.Dispose();
                 }
             }
 
-            _running = true;
         }
 
         public void PrintStats()

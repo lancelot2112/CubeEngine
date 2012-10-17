@@ -85,10 +85,10 @@ namespace CubeEngine.Rendering
             int worldZ = 0;
             int reg=0;
 
-            int vert1light = 0;
-            int vert2light = 0;
-            int vert3light = 0;
-            int vert4light = 0;
+            //int vert1light = 0;
+            //int vert2light = 0;
+            //int vert3light = 0;
+            //int vert4light = 0;
 
             int maxY = Chunk.HEIGHT - 1;
 
@@ -125,14 +125,14 @@ namespace CubeEngine.Rendering
 
                         if (n0.IsTransparent)
                         {
-                            store.SafeGetCube(reg, y + 1, worldZ, out n1);
-                            store.SafeGetCube(reg, y + 1, worldZ + 1, out n2);
+                            store.CheckYGetCube(reg, y + 1, worldZ, out n1);
+                            store.CheckYGetCube(reg, y + 1, worldZ + 1, out n2);
                             store.GetCube(reg, y, worldZ + 1, out n3);
-                            store.SafeGetCube(reg, y - 1, worldZ + 1, out n4);
-                            store.SafeGetCube(reg, y - 1, worldZ, out n5);
-                            store.SafeGetCube(reg, y - 1, worldZ - 1, out n6);
+                            store.CheckYGetCube(reg, y - 1, worldZ + 1, out n4);
+                            store.CheckYGetCube(reg, y - 1, worldZ, out n5);
+                            store.CheckYGetCube(reg, y - 1, worldZ - 1, out n6);
                             store.GetCube(reg, y, worldZ - 1, out n7);
-                            store.SafeGetCube(reg, y + 1, worldZ - 1, out n8);
+                            store.CheckYGetCube(reg, y + 1, worldZ - 1, out n8);
 
                             vertexBuffer[ind++] = new CubeVertex(ref posNPN, ref CubeVertex.N_NEG_X, ref CubeVertex.TC00, ref current, ref n0, ref n1, ref n7, ref n8);
                             vertexBuffer[ind++] = new CubeVertex(ref posNPP, ref CubeVertex.N_NEG_X, ref CubeVertex.TC10, ref current, ref n0, ref n1, ref n2, ref n3);
@@ -148,14 +148,14 @@ namespace CubeEngine.Rendering
 
                         if (n0.IsTransparent)
                         {
-                            store.SafeGetCube(reg, y + 1, worldZ, out n1);
-                            store.SafeGetCube(reg, y + 1, worldZ + 1, out n2);
+                            store.CheckYGetCube(reg, y + 1, worldZ, out n1);
+                            store.CheckYGetCube(reg, y + 1, worldZ + 1, out n2);
                             store.GetCube(reg, y, worldZ + 1, out n3);
-                            store.SafeGetCube(reg, y - 1, worldZ + 1, out n4);
-                            store.SafeGetCube(reg, y - 1, worldZ, out n5);
-                            store.SafeGetCube(reg, y - 1, worldZ - 1, out n6);
+                            store.CheckYGetCube(reg, y - 1, worldZ + 1, out n4);
+                            store.CheckYGetCube(reg, y - 1, worldZ, out n5);
+                            store.CheckYGetCube(reg, y - 1, worldZ - 1, out n6);
                             store.GetCube(reg, y, worldZ - 1, out n7);
-                            store.SafeGetCube(reg, y + 1, worldZ - 1, out n8);
+                            store.CheckYGetCube(reg, y + 1, worldZ - 1, out n8);
 
                             vertexBuffer[ind++] = new CubeVertex(ref posPPP, ref CubeVertex.N_POS_X, ref CubeVertex.TC00, ref current, ref n0, ref n1, ref n2, ref n3);
                             vertexBuffer[ind++] = new CubeVertex(ref posPPN, ref CubeVertex.N_POS_X, ref CubeVertex.TC10, ref current, ref n0, ref n1, ref n7, ref n8);
@@ -170,7 +170,7 @@ namespace CubeEngine.Rendering
                         if (y != 0) store.GetCube(worldX, reg, worldZ, out n0);
                         else n0 = Cube.NULL;
 
-                        if (n0.IsTransparent && n0.Type != CubeType.NULL)
+                        if (n0.IsTransparent && n0.Material != CubeMaterial.None)
                         {
                             store.GetCube(worldX + 1, reg, worldZ, out n1);
                             store.GetCube(worldX + 1, reg, worldZ + 1, out n2);
@@ -194,7 +194,7 @@ namespace CubeEngine.Rendering
                         if (y != maxY) store.GetCube(worldX, reg, worldZ, out n0);
                         else n0 = Cube.NULL;
 
-                        if (n0.IsTransparent && n0.Type != CubeType.NULL)
+                        if (n0.IsTransparent && n0.Material != CubeMaterial.None)
                         {
                             store.GetCube(worldX + 1, reg, worldZ, out n1);
                             store.GetCube(worldX + 1, reg, worldZ + 1, out n2);
@@ -220,13 +220,13 @@ namespace CubeEngine.Rendering
                         if (n0.IsTransparent)
                         {
                             store.GetCube(worldX + 1, y, reg, out n1);
-                            store.SafeGetCube(worldX + 1, y + 1, reg, out n2);
-                            store.SafeGetCube(worldX, y + 1, reg, out n3);
-                            store.SafeGetCube(worldX - 1, y + 1, reg, out n4);
+                            store.CheckYGetCube(worldX + 1, y + 1, reg, out n2);
+                            store.CheckYGetCube(worldX, y + 1, reg, out n3);
+                            store.CheckYGetCube(worldX - 1, y + 1, reg, out n4);
                             store.GetCube(worldX - 1, y, reg, out n5);
-                            store.SafeGetCube(worldX - 1, y - 1, reg, out n6);
-                            store.SafeGetCube(worldX, y - 1, reg, out n7);
-                            store.SafeGetCube(worldX + 1, y - 1, reg, out n8);
+                            store.CheckYGetCube(worldX - 1, y - 1, reg, out n6);
+                            store.CheckYGetCube(worldX, y - 1, reg, out n7);
+                            store.CheckYGetCube(worldX + 1, y - 1, reg, out n8);
 
                             vertexBuffer[ind++] = new CubeVertex(ref posPPN, ref CubeVertex.N_NEG_Z, ref CubeVertex.TC00, ref current, ref n0, ref n1, ref n2, ref n3);
                             vertexBuffer[ind++] = new CubeVertex(ref posNPN, ref CubeVertex.N_NEG_Z, ref CubeVertex.TC10, ref current, ref n0, ref n3, ref n4, ref n5);
@@ -243,13 +243,13 @@ namespace CubeEngine.Rendering
                         if (n0.IsTransparent)
                         {
                             store.GetCube(worldX + 1, y, reg, out n1);
-                            store.SafeGetCube(worldX + 1, y + 1, reg, out n2);
-                            store.SafeGetCube(worldX, y + 1, reg, out n3);
-                            store.SafeGetCube(worldX - 1, y + 1, reg, out n4);
+                            store.CheckYGetCube(worldX + 1, y + 1, reg, out n2);
+                            store.CheckYGetCube(worldX, y + 1, reg, out n3);
+                            store.CheckYGetCube(worldX - 1, y + 1, reg, out n4);
                             store.GetCube(worldX - 1, y, reg, out n5);
-                            store.SafeGetCube(worldX - 1, y - 1, reg, out n6);
-                            store.SafeGetCube(worldX, y - 1, reg, out n7);
-                            store.SafeGetCube(worldX + 1, y - 1, reg, out n8);
+                            store.CheckYGetCube(worldX - 1, y - 1, reg, out n6);
+                            store.CheckYGetCube(worldX, y - 1, reg, out n7);
+                            store.CheckYGetCube(worldX + 1, y - 1, reg, out n8);
 
                             vertexBuffer[ind++] = new CubeVertex(ref posNPP, ref CubeVertex.N_POS_Z, ref CubeVertex.TC00, ref current, ref n0, ref n3, ref n4, ref n5);
                             vertexBuffer[ind++] = new CubeVertex(ref posPPP, ref CubeVertex.N_POS_Z, ref CubeVertex.TC10, ref current, ref n0, ref n1, ref n2, ref n3);
@@ -305,12 +305,12 @@ namespace CubeEngine.Rendering
                         //-y
                         if (y != 0) store.GetCube(worldX, y - 1, worldZ, out neighbor);
                         else neighbor = Cube.NULL;
-                        if (neighbor.IsTransparent && neighbor.Type != CubeType.NULL) SidesRenderable++;
+                        if (neighbor.IsTransparent && neighbor.Material != CubeMaterial.None) SidesRenderable++;
 
                         //+y
                         if (y != maxY) store.GetCube(worldX, y + 1, worldZ, out neighbor);
                         else neighbor = Cube.NULL;
-                        if (neighbor.IsTransparent && neighbor.Type != CubeType.NULL) SidesRenderable++;
+                        if (neighbor.IsTransparent && neighbor.Material != CubeMaterial.None) SidesRenderable++;
 
                         //-z
                         store.GetCube(worldX, y, worldZ - 1, out neighbor);

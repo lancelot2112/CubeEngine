@@ -21,7 +21,7 @@ struct VertexShaderInput
 	float2 uv : TEXCOORD0;
 	byte4 color : COLOR0;
 	byte4 light : COLOR1;
-	short2 brightness : COLOR2;
+	short2 sun : COLOR2;
 };
 
 struct VertexShaderOutput
@@ -29,7 +29,7 @@ struct VertexShaderOutput
     float4 position : POSITION0;
 	float4 color : COLOR0;
 	float4 light : COLOR1;
-	float2 brightness : COLOR2;
+	float sun : COLOR2;
 	float3 worldPos : COLOR3;
 	float2 uv : TEXCOORD0;
 	float3 normal : TEXCOORD1;
@@ -50,7 +50,7 @@ VertexShaderOutput VertexShaderFunction(VertexShaderInput input)
 	output.normal = float4(input.normal.xyzw);
 	output.color = float4(input.color.xyz*inv_255,input.color.w);
 	output.light = float4(input.light.xyz*inv_255,input.light.w);
-	output.brightness = float2(input.brightness/21.4 + 0.3);
+	output.sun = input.sun.x/21.4 + 0.3;
 	float radius = distance(output.position.xz,float2(0,0));
 	output.fog = saturate((radius-FogStartRadius)/FogRange);
     return output;
@@ -89,7 +89,7 @@ float4 PixelShaderFunction(VertexShaderOutput input) : COLOR0
 		tmpColor.xyz += fLightColor[i]*att*dot(normal,-direction);
 	}
 
-	float3 sun = tmpColor.xyz * input.brightness.y * (dot(SkyLightDir, normal));
+	float3 sun = tmpColor.xyz * input.sun * (dot(SkyLightDir, normal));
 	tmpColor.xyz = tmpColor.xyz * input.light.xyz * input.light.w + sun;
 	tmpColor = lerp(tmpColor,FogColor,input.fog);
 	return tmpColor;

@@ -204,18 +204,27 @@ namespace CubeEngine.Basic
         }
         public void BuildVertices(CubeVertex[] buffer, GraphicsDevice graphics, CubeStorage store)
         {
+
             ChunkMesh currentMesh;
             int i = 0;
-            while(i < HEIGHT)
+            while (i < HEIGHT)
             {
                 currentMesh = new ChunkMesh(i, ref Position);
                 currentMesh.BuildVertices(buffer, graphics, this, store);
-                if (!currentMesh.Empty) Meshes.Add(currentMesh);
+                if(!currentMesh.Empty) Meshes.Add(currentMesh);
                 i += Chunk.WIDTH;
             }
 
         }
 
+        public void RebuildVertices(CubeVertex[] buffer, GraphicsDevice graphics, CubeStorage store, int yChange)
+        {
+            //ChunkMesh currentMesh;
+            for (int i = 0; i < Meshes.Count; i++)
+            {
+                
+            }
+        }
         public bool LoadFromDisk()
         {
             return false;

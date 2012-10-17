@@ -17,7 +17,7 @@ namespace CubeEngine.Rendering
         public Vector2 Texture;
         public byte Red, Green, Blue, Alpha;
         public byte LocalRed, LocalGreen, LocalBlue, LocalLight;
-        public short Luminance, SkyLight;
+        public short SkyLight;
 
 
         public readonly static VertexDeclaration VertexDeclaration = new VertexDeclaration
@@ -39,12 +39,39 @@ namespace CubeEngine.Rendering
             this.Green = cube.Green;
             this.Blue = cube.Blue;
             this.Alpha = (byte)cube.Alpha;
-            this.Luminance = (byte)cube.Specular;
-            this.LocalRed = (byte)((n1.LocalRed + n2.LocalRed + n3.LocalRed + n4.LocalRed) * 0.25f);
-            this.LocalGreen = (byte)((n1.LocalGreen + n2.LocalGreen + n3.LocalGreen + n4.LocalGreen) * 0.25f);
-            this.LocalBlue = (byte)((n1.LocalBlue + n2.LocalBlue + n3.LocalBlue + n4.LocalBlue) * 0.25f);
-            this.LocalLight = (byte)((n1.LocalLight + n2.LocalLight + n3.LocalLight + n4.LocalLight) * 0.25f);
-            this.SkyLight = (byte)((n1.SunLight + n2.SunLight + n3.SunLight + n4.SunLight) * 0.25f);
+            int lr = 0;
+            int lg = 0;
+            int lb = 0;
+            if (n1.IsTransparent)
+            {
+                lr = n1.Red;
+                lg = n1.Green;
+                lb = n1.Blue;
+            }
+            if (n2.IsTransparent)
+            {
+                lr = lr + n2.Red;
+                lg = lg + n2.Green;
+                lb = lb + n2.Blue;
+            }
+            if (n3.IsTransparent)
+            {
+                lr = lr + n3.Red;
+                lg = lg + n3.Green;
+                lb = lb + n3.Blue;
+            }
+            if (n4.IsTransparent)
+            {
+                lr = lr + n4.Red;
+                lg = lg + n4.Green;
+                lb = lb + n4.Blue;
+            }
+            this.LocalRed = (byte)(lr >> 2);
+            this.LocalGreen = (byte)(lg >> 2);
+            this.LocalBlue = (byte)(lb >> 2);
+            byte light = (byte)((n1.LightLevels + n2.LightLevels + n3.LightLevels + n4.LightLevels) >> 2);
+            this.LocalLight = (byte)((light & 240) >> 4);
+            this.SkyLight = (short)(light & 15);
         }
 
         VertexDeclaration IVertexType.VertexDeclaration { get { return VertexDeclaration; } }

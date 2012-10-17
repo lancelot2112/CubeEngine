@@ -8,103 +8,78 @@ using Microsoft.Xna.Framework.Graphics.PackedVector;
 namespace CubeEngine.Basic
 {
 
-    [Flags]
-    public enum CubeFace : byte
+    public struct CubeLight
     {
-        NONE = 0,
-        PosX = 1,
-        NegX = 2,
-        PosY = 4,
-        NegY = 8,
-        PosZ = 16,
-        NegZ = 32
+        /// <summary>
+        /// Contains the light levels of the surrounding faces.
+        /// Bits 1-4 Sunlight [0,15]
+        ///     to accesss use val & 15
+        /// Bits 5-8 LocalLight [0,15]
+        ///     to access use (val & 240) >> 4
+        /// </summary>
+        public byte LightLevels;
+        /// <summary>
+        /// Stores the individual color channel values so that 
+        /// colored lights can be used.
+        /// </summary>
+        public byte Red, Green, Blue;
+        /// <summary>
+        /// Vertical offset in the 'voxel' column, since continuous 
+        /// data is not kept and position can't be inferred by the 
+        /// position in the array.
+        /// </summary>
+        public byte Offset;
+        /// <summary>
+        /// Cube faces 'registered' to this light value.
+        /// Bit 1 +x (+x cube but -x face of that cube) val & 1
+        /// Bit 2 -x (-x cube but +x face of that cube) val & 2
+        /// Bit 3 +y (+y cube but -y face of that cube) val & 4
+        /// Bit 4 -y (-y cube but +y face of that cube) val & 8
+        /// Bit 5 +z (+z cube but -z face of that cube) val & 16
+        /// Bit 6 -z (-z cube but +z face of that cube) val & 32
+        /// </summary>
+        public byte SidesFlag;
     }
 
-    public enum CubeType : byte
+    public enum CubeMaterial : byte
     {
-        NULL = 0,
-        Air,
+        None = 0,
         Dirt,
         Grass,
         Stone
     }
-    // Value type defining the characteristics of a cube
+    /// <summary>
+    /// Contains information for a Run-Length encoding scheme
+    /// </summary>
     public struct Cube
     {
-        public byte Red, Green, Blue, AlphaSpecular;
-        public byte LocalRed, LocalGreen, LocalBlue, LightLevels;
-        public CubeType Type;
-        public byte Other;
+        /// <summary>
+        /// Material of the cube will be used to access cube metadata 
+        /// and determine how to render.
+        /// </summary>
+        public CubeMaterial Material;
+        /// <summary>
+        /// Number of consecutive cubes of this Material.  Used in the 
+        /// Run-Length Encoding scheme for each cube column.
+        /// </summary>
+        public Byte Run;
 
-        public Cube(CubeType type)
+        public Cube(CubeMaterial material, byte run)
         {
-            this = CUBE_TYPES[(byte)type];
-            this.Red = (byte)((XerUtilities.Common.MathLib.NextRandom() * 20) + Red);
-            this.Blue = (byte)((XerUtilities.Common.MathLib.NextRandom() * 20) + Blue);
-            this.Green = (byte)((XerUtilities.Common.MathLib.NextRandom() * 20) + Green);
+            this.Material = material;
+            this.Run = run;
         }
 
-        public Cube(CubeType type, byte red, byte green, byte blue, byte alphaSpecular)
-            :this(type,red,green, blue,alphaSpecular,0,0,0,0,0) {}
-
-        public Cube(CubeType type, byte red, byte green, byte blue, byte alphaSpecular, byte localRed, byte localGreen, byte localBlue, byte lightLevels, byte other)
-        {
-            this.Type = type;
-            this.Red = red;
-            this.Blue = blue;
-            this.Green = green;
-            this.AlphaSpecular = alphaSpecular;
-            this.LocalRed = localRed;
-            this.LocalBlue = localBlue;
-            this.LocalGreen = localGreen;
-            this.LightLevels = lightLevels;
-            this.Other = other;
-        }
-
-        public int Opacity
-        {
-            get
-            {
-                return AlphaSpecular & 15;
-            }
-        }
-
-        public bool IsTransparent
-        {
-            get
-            {
-                if ((AlphaSpecular & 15) != 15) return true;
-                else return false;
-            }
-        }
-
-        public bool IsRenderable
-        {
-            get
-            {
-                if ((AlphaSpecular & 15) != 0) return true;
-                return false;
-            }
-        }
-
-        public int SunLight { get { return LightLevels & 15; } set { LightLevels = (byte)((value & 15) | (LightLevels & 240)); } }
-        public int LocalLight { get { return (LightLevels & 240) >> 4; } set { LightLevels = (byte)(((value & 15) << 4) | (LightLevels & 15)); } }
-        public int Alpha { get { return AlphaSpecular & 15; } set { AlphaSpecular = (byte)((value & 15) | (AlphaSpecular & 240)); } }
-        //TODO: Work on fixing set
-        public int Specular { get { return (AlphaSpecular & 240) >> 4; } set { AlphaSpecular = (byte)(((value & 15) << 4) | (AlphaSpecular & 15)); } }
+        public bool IsTransparent { get { return Material == 0; } }
 
         public override string ToString()
         {
-            return "t: " + Type.ToString() + " | sl: " + SunLight.ToString() + " | ll: " + LocalLight.ToString();
+            return "m: " + Material.ToString() + " | run: " + Run.ToString();
         }
 
+        /// <summary>
+        /// NULL cube containing 0 Material
+        /// </summary>
         public static Cube NULL = new Cube();
-        public static Cube[] CUBE_TYPES = new Cube[] 
-        { new Cube(CubeType.NULL,0,0,0,0),
-            new Cube(CubeType.Air,0,0,0,0),
-            new Cube(CubeType.Dirt,193,154,107,15),
-            new Cube(CubeType.Grass,0,100,0,15),
-            new Cube(CubeType.Stone,112,138,144,15)
-        };
     }
 }

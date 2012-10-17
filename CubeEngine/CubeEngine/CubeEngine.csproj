@@ -113,6 +113,8 @@
     <Compile Include="Basic\ChunkStorage.cs" />
     <Compile Include="Basic\ChunkManager.cs" />
     <Compile Include="Basic\Cube.cs" />
+    <Compile Include="Basic\ICubeStorage.cs" />
+    <Compile Include="Basic\RLECubeStorage.cs" />
     <Compile Include="Rendering\ChunkMesh.cs" />
     <Compile Include="Basic\CubeStorage.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -121,6 +123,7 @@
     <Compile Include="Rendering\ChunkMeshRenderer.cs" />
     <Compile Include="Rendering\CubeVertex.cs" />
     <Compile Include="Settings.cs" />
+    <Compile Include="Utilities\MathI.cs" />
     <Compile Include="Utilities\Noise\ChunkNoise.cs" />
     <Compile Include="Utilities\Noise\NoiseBase.cs" />
     <Compile Include="Utilities\Noise\SimplexNoise.cs" />

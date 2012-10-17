@@ -105,6 +105,10 @@
     <Reference Include="System.Net">
       <Private>False</Private>
     </Reference>
+    <Reference Include="XerUtilities, Version=1.0.0.0, Culture=neutral, processorArchitecture=x86">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\lib\XerUtilities\bin\x86\Debug\XerUtilities.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Actors\LocalPlayer.cs" />
@@ -133,10 +137,6 @@
     <Content Include="GameThumbnail.png" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\XerUtilities\XerUtilities.csproj">
-      <Project>{FD1FEEA1-2484-4FE1-915E-7305717CD28F}</Project>
-      <Name>XerUtilities</Name>
-    </ProjectReference>
     <ProjectReference Include="..\CubeEngineContent\CubeEngineContent.contentproj">
       <Name>CubeEngineContent</Name>
       <XnaReferenceType>Content</XnaReferenceType>

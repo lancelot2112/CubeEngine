@@ -1,0 +1,3 @@
+[submodule "lib/XerUtilities"]
+	path = lib/XerUtilities
+	url = git://github.com/lancelot2112/XerUtilities.git
